@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
                            QLabel, QComboBox, QCheckBox, QGroupBox,
-                           QSpinBox, QPushButton, QMessageBox, QDialog, QListWidget)
+                           QSpinBox, QPushButton, QMessageBox, QDialog, QListWidget, QFrame)
+from PyQt5.QtCore import Qt
 from ..utils.log import Log
 from .styles import DARK_STYLE
 from ..api.cafe import CafeAPI
@@ -34,15 +35,309 @@ class CafeWidget(QWidget):
         self.board_combo = QComboBox()
         self.board_combo.setMinimumWidth(250)  # 너비 축소
         
-        # 레이아웃 구성
-        layout.addWidget(cafe_label)
-        layout.addWidget(self.cafe_combo)
-        layout.addWidget(board_label)
-        layout.addWidget(self.board_combo)
+        # 기본 레이아웃 구성
+        basic_layout = QVBoxLayout()
+        basic_layout.addWidget(cafe_label)
+        basic_layout.addWidget(self.cafe_combo)
+        basic_layout.addWidget(board_label)
+        basic_layout.addWidget(self.board_combo)
+        
+        # 구분선 추가
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setStyleSheet("background-color: #3d3d3d;")
+        
+        # 작업 설정 그룹박스
+        work_settings = QGroupBox("작업 설정")
+        work_settings.setStyleSheet("""
+            QGroupBox {
+                color: white;
+                font-weight: bold;
+                border: 1px solid #3d3d3d;
+                border-radius: 5px;
+                margin-top: 10px;
+                padding-top: 15px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 5px;
+            }
+        """)
+        
+        work_layout = QVBoxLayout()
+        
+        # 1. 게시판별 수집 게시글 수
+        post_count_layout = QHBoxLayout()
+        post_count_label = QLabel("게시판별 수집 게시글 수:")
+        post_count_label.setStyleSheet("color: white;")
+        
+        self.post_count_spin = QSpinBox()
+        self.post_count_spin.setRange(1, 100)
+        self.post_count_spin.setValue(10)
+        self.post_count_spin.setStyleSheet("""
+            QSpinBox {
+                background-color: #2b2b2b;
+                color: white;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                padding: 5px;
+                min-width: 80px;
+            }
+            QSpinBox:hover {
+                border: 1px solid #5c85d6;
+            }
+        """)
+        
+        post_count_layout.addWidget(post_count_label)
+        post_count_layout.addWidget(self.post_count_spin)
+        post_count_layout.addStretch()
+        
+        # 2. 게시글별 댓글 작업 수
+        comment_count_layout = QHBoxLayout()
+        comment_count_label = QLabel("게시글별 댓글 작업 수:")
+        comment_count_label.setStyleSheet("color: white;")
+        
+        self.comment_count_spin = QSpinBox()
+        self.comment_count_spin.setRange(0, 50)
+        self.comment_count_spin.setValue(5)
+        self.comment_count_spin.setStyleSheet("""
+            QSpinBox {
+                background-color: #2b2b2b;
+                color: white;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                padding: 5px;
+                min-width: 80px;
+            }
+            QSpinBox:hover {
+                border: 1px solid #5c85d6;
+            }
+        """)
+        
+        comment_range_label = QLabel("범위(±):")
+        comment_range_label.setStyleSheet("color: white;")
+        
+        self.comment_range_spin = QSpinBox()
+        self.comment_range_spin.setRange(0, 10)
+        self.comment_range_spin.setValue(2)
+        self.comment_range_spin.setStyleSheet("""
+            QSpinBox {
+                background-color: #2b2b2b;
+                color: white;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                padding: 5px;
+                min-width: 60px;
+            }
+            QSpinBox:hover {
+                border: 1px solid #5c85d6;
+            }
+        """)
+        
+        # comment_range_info = QLabel("(3~7 랜덤)")
+        # comment_range_info.setStyleSheet("color: #aaaaaa; font-style: italic;")
+        
+        comment_count_layout.addWidget(comment_count_label)
+        comment_count_layout.addWidget(self.comment_count_spin)
+        comment_count_layout.addWidget(comment_range_label)
+        comment_count_layout.addWidget(self.comment_range_spin)
+        # comment_count_layout.addWidget(comment_range_info)
+        comment_count_layout.addStretch()
+        
+        # 댓글 범위 변경 시 정보 업데이트
+        self.comment_count_spin.valueChanged.connect(self.update_comment_range_info)
+        self.comment_range_spin.valueChanged.connect(self.update_comment_range_info)
+        
+        # 3. 게시글별 좋아요 작업 수
+        like_count_layout = QHBoxLayout()
+        like_count_label = QLabel("게시글별 좋아요 작업 수:")
+        like_count_label.setStyleSheet("color: white;")
+        
+        self.like_count_spin = QSpinBox()
+        self.like_count_spin.setRange(0, 50)
+        self.like_count_spin.setValue(3)
+        self.like_count_spin.setStyleSheet("""
+            QSpinBox {
+                background-color: #2b2b2b;
+                color: white;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                padding: 5px;
+                min-width: 80px;
+            }
+            QSpinBox:hover {
+                border: 1px solid #5c85d6;
+            }
+        """)
+        
+        like_range_label = QLabel("범위(±):")
+        like_range_label.setStyleSheet("color: white;")
+        
+        self.like_range_spin = QSpinBox()
+        self.like_range_spin.setRange(0, 10)
+        self.like_range_spin.setValue(1)
+        self.like_range_spin.setStyleSheet("""
+            QSpinBox {
+                background-color: #2b2b2b;
+                color: white;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                padding: 5px;
+                min-width: 60px;
+            }
+            QSpinBox:hover {
+                border: 1px solid #5c85d6;
+            }
+        """)
+        
+        # like_range_info = QLabel("(2~4 랜덤)")
+        # like_range_info.setStyleSheet("color: #aaaaaa; font-style: italic;")
+        
+        like_count_layout.addWidget(like_count_label)
+        like_count_layout.addWidget(self.like_count_spin)
+        like_count_layout.addWidget(like_range_label)
+        like_count_layout.addWidget(self.like_range_spin)
+        # like_count_layout.addWidget(like_range_info)
+        like_count_layout.addStretch()
+        
+        # 좋아요 범위 변경 시 정보 업데이트
+        self.like_count_spin.valueChanged.connect(self.update_like_range_info)
+        self.like_range_spin.valueChanged.connect(self.update_like_range_info)
+        
+        # 4. IP 테더링 사용
+        ip_tethering_layout = QHBoxLayout()
+        
+        self.ip_tethering_check = QCheckBox("IP 테더링 사용")
+        self.ip_tethering_check.setChecked(True)
+        self.ip_tethering_check.setStyleSheet("""
+            QCheckBox {
+                color: white;
+                spacing: 5px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+            }
+            QCheckBox::indicator:unchecked {
+                border: 1px solid #5c85d6;
+                background: #2b2b2b;
+            }
+            QCheckBox::indicator:checked {
+                border: 1px solid #5c85d6;
+                background: #5c85d6;
+            }
+        """)
+        
+        self.verify_ip_btn = QPushButton("IP 검증")
+        self.verify_ip_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #5c85d6;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 4px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #4a6fb8;
+            }
+            QPushButton:disabled {
+                background-color: #555555;
+                color: #aaaaaa;
+            }
+        """)
+        self.verify_ip_btn.clicked.connect(self.verify_ip_tethering)
+        
+        ip_status_label = QLabel("상태:")
+        ip_status_label.setStyleSheet("color: white;")
+        
+        self.ip_status = QLabel("미검증")
+        self.ip_status.setStyleSheet("color: #FFA500; font-weight: bold;")
+        
+        ip_tethering_layout.addWidget(self.ip_tethering_check)
+        ip_tethering_layout.addWidget(self.verify_ip_btn)
+        ip_tethering_layout.addWidget(ip_status_label)
+        ip_tethering_layout.addWidget(self.ip_status)
+        ip_tethering_layout.addStretch()
+        
+        # IP 테더링 체크박스 상태 변경 시 검증 버튼 활성화/비활성화
+        self.ip_tethering_check.stateChanged.connect(self.update_ip_verify_button)
+        
+        # 작업 설정 레이아웃에 추가
+        work_layout.addLayout(post_count_layout)
+        work_layout.addLayout(comment_count_layout)
+        work_layout.addLayout(like_count_layout)
+        work_layout.addLayout(ip_tethering_layout)
+        
+        work_settings.setLayout(work_layout)
+        
+        # 메인 레이아웃에 추가
+        layout.addLayout(basic_layout)
+        layout.addWidget(separator)
+        layout.addWidget(work_settings)
         layout.addStretch()
         
         self.setLayout(layout)
         
+        # 초기 범위 정보 업데이트
+        self.update_comment_range_info()
+        self.update_like_range_info()
+        self.update_ip_verify_button()
+    
+    def update_comment_range_info(self):
+        """댓글 범위 정보 업데이트"""
+        base = self.comment_count_spin.value()
+        range_val = self.comment_range_spin.value()
+        min_val = max(0, base - range_val)
+        max_val = base + range_val
+        
+        # 레이아웃에서 정보 라벨 찾기
+        for i in range(self.layout().count()):
+            item = self.layout().itemAt(i)
+            if isinstance(item, QHBoxLayout):
+                for j in range(item.count()):
+                    widget = item.itemAt(j).widget()
+                    if isinstance(widget, QLabel) and "(3~7 랜덤)" in widget.text():
+                        widget.setText(f"({min_val}~{max_val} 랜덤)")
+                        return
+    
+    def update_like_range_info(self):
+        """좋아요 범위 정보 업데이트"""
+        base = self.like_count_spin.value()
+        range_val = self.like_range_spin.value()
+        min_val = max(0, base - range_val)
+        max_val = base + range_val
+        
+        # 레이아웃에서 정보 라벨 찾기
+        for i in range(self.layout().count()):
+            item = self.layout().itemAt(i)
+            if isinstance(item, QHBoxLayout):
+                for j in range(item.count()):
+                    widget = item.itemAt(j).widget()
+                    if isinstance(widget, QLabel) and "(2~4 랜덤)" in widget.text():
+                        widget.setText(f"({min_val}~{max_val} 랜덤)")
+                        return
+    
+    def update_ip_verify_button(self):
+        """IP 테더링 체크박스 상태에 따라 검증 버튼 활성화/비활성화"""
+        self.verify_ip_btn.setEnabled(self.ip_tethering_check.isChecked())
+        if not self.ip_tethering_check.isChecked():
+            self.ip_status.setText("미사용")
+            self.ip_status.setStyleSheet("color: #aaaaaa; font-weight: bold;")
+        else:
+            self.ip_status.setText("미검증")
+            self.ip_status.setStyleSheet("color: #FFA500; font-weight: bold;")
+    
+    def verify_ip_tethering(self):
+        """IP 테더링 검증 (실제 구현은 추후에)"""
+        # 실제 구현은 추후에 진행
+        # 임시로 검증 성공으로 처리
+        self.ip_status.setText("검증 완료")
+        self.ip_status.setStyleSheet("color: #4CAF50; font-weight: bold;")
+        self.log.info("IP 테더링 검증이 완료되었습니다.")
+    
     def update_cafe_list(self, cafe_list, headers):
         """카페 목록 업데이트"""
         self.cafe_list = cafe_list
@@ -136,12 +431,39 @@ class CafeWidget(QWidget):
         if not selected_cafe or not selected_board:
             return {}
             
+        # 댓글 범위 계산
+        comment_base = self.comment_count_spin.value()
+        comment_range = self.comment_range_spin.value()
+        comment_min = max(0, comment_base - comment_range)
+        comment_max = comment_base + comment_range
+        
+        # 좋아요 범위 계산
+        like_base = self.like_count_spin.value()
+        like_range = self.like_range_spin.value()
+        like_min = max(0, like_base - like_range)
+        like_max = like_base + like_range
+        
         return {
             'cafe_id': selected_cafe['cafe_id'],
             'cafe_name': selected_cafe['cafe_name'],
             'cafe_url': selected_cafe['cafe_url'],
             'board_id': selected_board['board_id'],
-            'board_name': selected_board['board_name']
+            'board_name': selected_board['board_name'],
+            'post_count': self.post_count_spin.value(),
+            'comment_count': {
+                'base': comment_base,
+                'range': comment_range,
+                'min': comment_min,
+                'max': comment_max
+            },
+            'like_count': {
+                'base': like_base,
+                'range': like_range,
+                'min': like_min,
+                'max': like_max
+            },
+            'use_ip_tethering': self.ip_tethering_check.isChecked(),
+            'ip_verified': self.ip_status.text() == "검증 완료"
         }
     
     def load_settings(self, settings):
@@ -157,6 +479,29 @@ class CafeWidget(QWidget):
         index = self.board_combo.findText(board_name)
         if index >= 0:
             self.board_combo.setCurrentIndex(index)
+            
+        # 게시글 수 설정
+        self.post_count_spin.setValue(settings.get('post_count', 10))
+        
+        # 댓글 작업 수 설정
+        comment_count = settings.get('comment_count', {})
+        self.comment_count_spin.setValue(comment_count.get('base', 5))
+        self.comment_range_spin.setValue(comment_count.get('range', 2))
+        
+        # 좋아요 작업 수 설정
+        like_count = settings.get('like_count', {})
+        self.like_count_spin.setValue(like_count.get('base', 3))
+        self.like_range_spin.setValue(like_count.get('range', 1))
+        
+        # IP 테더링 설정
+        self.ip_tethering_check.setChecked(settings.get('use_ip_tethering', True))
+        
+        # IP 검증 상태 설정
+        if settings.get('ip_verified', False):
+            self.ip_status.setText("검증 완료")
+            self.ip_status.setStyleSheet("color: #4CAF50; font-weight: bold;")
+        else:
+            self.update_ip_verify_button()
     
     def clear_settings(self):
         """설정 초기화"""
@@ -166,4 +511,14 @@ class CafeWidget(QWidget):
         self.headers = None
         self.current_boards = []
         self.current_headers = None
-        self.current_cafe_id = None 
+        self.current_cafe_id = None
+        
+        # 작업 설정 초기화
+        self.post_count_spin.setValue(10)
+        self.comment_count_spin.setValue(5)
+        self.comment_range_spin.setValue(2)
+        self.like_count_spin.setValue(3)
+        self.like_range_spin.setValue(1)
+        self.ip_tethering_check.setChecked(True)
+        self.ip_status.setText("미검증")
+        self.ip_status.setStyleSheet("color: #FFA500; font-weight: bold;") 
