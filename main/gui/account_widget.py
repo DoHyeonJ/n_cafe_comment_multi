@@ -384,6 +384,7 @@ class AccountWidget(QWidget):
         
         # 버튼 영역 (하단에 배치)
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(10)  # 버튼 간격 설정
         
         # 계정 설정 관리 버튼
         self.account_manage_btn = QPushButton("계정 그룹 관리")

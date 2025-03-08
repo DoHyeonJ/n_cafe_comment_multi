@@ -374,7 +374,7 @@ class RoutineTab(BaseMonitorWidget):
         
         # 탭 추가
         tab_widget.addTab(task_manage_tab, "작업 관리")
-        tab_widget.addTab(post_monitor_tab, "게시글 모니터")
+        tab_widget.addTab(post_monitor_tab, "작업 모니터")
         tab_widget.addTab(notice_tab, "공지사항")
         tab_widget.addTab(support_tab, "기간연장/문의")
         

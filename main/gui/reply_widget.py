@@ -528,6 +528,7 @@ class ReplySettingWidget(QWidget):
         self.setLayout(layout)
 
     def get_settings(self):
+        """댓글 설정 정보 반환"""
         return {
             'use_reply': self.use_reply.isChecked(),
             'use_nickname': self.use_nickname.isChecked(),

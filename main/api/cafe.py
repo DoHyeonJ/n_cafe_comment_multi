@@ -14,7 +14,16 @@ class CafeAPI:
         api_url = "https://apis.naver.com/cafe-home-web/cafe-home/v1/cafes/join?page=1&perPage=1000&type=join&recentUpdates=true"
         response = requests.get(api_url, headers=self.headers)
         data = response.json()
-        return [(cafe['cafeId'], cafe['cafeUrl'], cafe['cafeName']) for cafe in data['message']['result']['cafes']]
+        
+        # 딕셔너리 형태로 반환
+        return [
+            {
+                'cafe_id': cafe['cafeId'], 
+                'cafe_url': cafe['cafeUrl'], 
+                'cafe_name': cafe['cafeName']
+            } 
+            for cafe in data['message']['result']['cafes']
+        ]
 
 
     def check_cafe_id(self, url:str, cafe_id = None):
@@ -42,26 +51,20 @@ class CafeAPI:
             url = f"https://apis.naver.com/cafe-web/cafe2/SideMenuList?cafeId={cafe_id}"
             response = requests.get(url, headers=self.headers)
 
-            # menu_list.append({'menu_id': "all",'menu_name': "전체 게시글", 'menu_type': "",'board_type': "",'sort': 0})
-
             response_json = response.json()
             if response.status_code == 200:
                 for menu in response_json['message']['result']['menus']:
                     if menu['menuType'] != 'P' and menu['menuType'] != 'L' and menu['menuType'] != 'F':
                         menu_list.append({
-                            'menu_id': menu['menuId'],
-                            'menu_name': html.unescape(menu['menuName']), 
+                            'board_id': menu['menuId'],
+                            'board_name': menu['menuName'],
                             'menu_type': menu['menuType'],
-                            'board_type': menu['boardType'],
-                            'sort': menu['listOrder']
+                            'board_type': menu.get('boardType', ''),
+                            'sort': menu.get('sort', 0)
                         })
-
-                menu_list.sort(key=lambda x: x['sort'])
-                return menu_list
-            
-            return False
-        except:
-            logging.error(f"게시판 목록 조회 Error :: {traceback.format_exc()}")
+            return menu_list
+        except Exception as e:
+            logging.error(f"게시판 목록 조회 오류: {str(e)}")
             return []
         
     def get_cafe_info(self, cafe_id):

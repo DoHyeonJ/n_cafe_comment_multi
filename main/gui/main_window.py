@@ -149,7 +149,7 @@ class TaskListItem(QWidget):
         button_layout.addWidget(self.info_btn)
         
         layout.addWidget(left_container)
-        layout.addWidget(info_container, stretch=1)
+        layout.addWidget(info_container)
         layout.addWidget(button_container)
         self.setLayout(layout)
         
@@ -186,17 +186,39 @@ class TaskListItem(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.accounts = {}  # {account_id: {'pw': pw, 'headers': headers, 'cafe_list': []}}
-        self.tasks = []  # 모든 계정의 작업을 관리하는 통합 리스트
+        
+        # 로그 초기화
         self.log = Log()
-        self.licence = Licence()  # 라이선스 체크는 백엔드에서 처리
-        self.settings_manager = SettingsManager()  # 설정 관리자 초기화
-        self.ai_api_key = ""  # API 키 속성 추가
-
-        # 라이선스 체크
+        
+        # 라이선스 초기화
+        self.licence = Licence()
+        
+        # 계정 정보 초기화
+        self.accounts = {}  # 계정 정보 저장 딕셔너리
+        
+        # 작업 목록 초기화
+        self.tasks = []  # 작업 목록
+        self.next_task_id = 1  # 다음 작업 ID
+        
+        # 작업 실행 상태
+        self.is_running = False
+        self.workers = []  # 워커 목록
+        
+        # 모니터링 위젯 생성
+        self.monitor_widget = RoutineTab(self.log)
+        
+        # 모니터링 위젯 시그널 연결
+        self.monitor_widget.add_task_clicked.connect(self.add_task)
+        self.monitor_widget.remove_task_clicked.connect(self.remove_task)
+        self.monitor_widget.remove_all_clicked.connect(self.remove_all_tasks)
+        self.monitor_widget.execute_tasks_clicked.connect(self.run_tasks)
+        
+        # 라이선스 확인
         if not self.check_and_create_license():
-            sys.exit()
-
+            self.handle_missing_license()
+            return
+            
+        # UI 초기화
         self.init_ui()
 
     def check_and_create_license(self):
@@ -280,146 +302,70 @@ class MainWindow(QMainWindow):
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         
-        # 스타일 적용
-        self.setStyleSheet(DARK_STYLE)
+        # 메인 레이아웃 설정 (좌우 분할)
+        main_layout = QHBoxLayout()
+        main_widget.setLayout(main_layout)
         
-        # 레이아웃 설정
-        grid = QGridLayout()
-        main_widget.setLayout(grid)
-
-        # 오른쪽 영역 (모니터링) - 먼저 생성
-        self.monitor_widget = RoutineTab(self.log)  # ScriptMonitorWidget 대신 RoutineTab 사용
-        
-        # 작업 추가/삭제 버튼 이벤트 연결
-        self.monitor_widget.add_task_clicked.connect(self.add_task)
-        self.monitor_widget.remove_task_clicked.connect(self.remove_task)
-        self.monitor_widget.remove_all_clicked.connect(self.remove_all_tasks)  # 전체 삭제 시그널 연결
-        self.monitor_widget.execute_tasks_clicked.connect(self.run_tasks)  # 작업 실행 시그널 연결
-
-        # 왼쪽 영역 (계정 목록 + 설정)
+        # 좌측 영역 (계정 관리 + 설정)
         left_widget = QWidget()
         left_layout = QVBoxLayout()
-        
-        # 1. 계정 목록 영역
-        account_group = QGroupBox("계정 관리")
-        account_layout = QVBoxLayout()
-        
-        # AccountWidget 추가
-        self.account_widget = AccountWidget(self.log, self.monitor_widget)
-        self.account_widget.account_added.connect(self.add_account_to_list)
-        self.account_widget.account_removed.connect(self.remove_account_from_list)
-        self.account_widget.login_success.connect(self.on_login_success)
-        self.account_widget.account_selected.connect(self.on_account_selected)
-        
-        account_layout.addWidget(self.account_widget)
-        account_group.setLayout(account_layout)
-        
-        # 2. 설정 영역
-        settings_group = QGroupBox("계정별 설정")
-        settings_layout = QVBoxLayout()
-        
-        # 설정 탭
-        self.settings_tab = ScriptTab(self.log)
-        settings_layout.addWidget(self.settings_tab)
-        settings_group.setLayout(settings_layout)
-        
-        # 설정 저장/불러오기 버튼
-        script_btn_layout = QHBoxLayout()
-        self.settings_btn = QPushButton("설정 관리")
-
-        # 버튼 스타일 설정
-        btn_style = """
-            QPushButton {
-                background-color: #5c85d6;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 0px;
-                font-size: 14px;
-                min-height: 40px;  /* 실행 버튼과 동일한 높이 */
-            }
-            QPushButton:hover {
-                background-color: #4a6fb8;
-            }
-        """
-        self.settings_btn.setStyleSheet(btn_style)
-
-        script_btn_layout.addWidget(self.settings_btn)
-
-        # 왼쪽 레이아웃에 위젯 추가
-        left_layout.addWidget(account_group)
-        left_layout.addWidget(settings_group)
-        left_layout.addLayout(script_btn_layout)
-        
-        # 라이선스 정보 영역 추가
-        license_info = QWidget()
-        license_layout = QHBoxLayout(license_info)
-        license_layout.setContentsMargins(5, 5, 5, 5)
-        
-        version_label = QLabel("v1.0.0")
-        version_label.setStyleSheet("""
-            color: #808080;
-            font-size: 12px;
-        """)
-        
-        # 라이선스 상태 확인 및 표시
-        expiry_date = self.licence.get_expiry_date()  # 만료일 가져오기
-        days_left = self.licence.get_days_left()      # 남은 일수 가져오기
-        
-        expiry_text = f"라이선스 만료일: {expiry_date}"
-        if days_left <= 0:
-            expiry_style = """
-                color: #ff4444;  /* 빨간색 - 만료 */
-                font-size: 12px;
-                font-weight: bold;
-            """
-            expiry_text = "라이선스가 만료되었습니다"
-        elif days_left <= 7:
-            expiry_style = """
-                color: #ff8c00;  /* 주황색 - 만료 임박 */
-                font-size: 12px;
-                font-weight: bold;
-            """
-            expiry_text = f"라이선스 만료 임박: {expiry_date} (D-{days_left})"
-        else:
-            expiry_style = """
-                color: #4CAF50;  /* 초록색 - 유효 */
-                font-size: 12px;
-            """
-        
-        expiry_label = QLabel(expiry_text)
-        expiry_label.setStyleSheet(expiry_style)
-        
-        license_layout.addWidget(version_label)
-        license_layout.addStretch()
-        license_layout.addWidget(expiry_label)
-        
-        left_layout.addStretch()  # 라이선스 정보를 하단에 고정
-        left_layout.addWidget(license_info)
         left_widget.setLayout(left_layout)
         
-        # 레이아웃 배치
-        grid.addWidget(left_widget, 0, 0)
-        grid.addWidget(self.monitor_widget, 0, 1)
-
-        # 컬럼 비율 설정
-        grid.setColumnStretch(0, 4)
-        grid.setColumnStretch(1, 5)
-
-        # 윈도우 설정
-        self.setWindowTitle('네이버 카페 AI 자동 활성화')
-        self.setWindowIcon(QIcon('main_logo.ico'))
-        self.setGeometry(100, 100, 1100, 800)
-        self.setMinimumWidth(1100)
-
-        # 버튼 이벤트 연결
-        self.settings_btn.clicked.connect(self.show_settings_dialog)
-
-        # 작업 순서 변경 시그널 연결
-        self.monitor_widget.task_list.model().rowsMoved.connect(self.on_tasks_reordered)
-
-        # 메뉴바 추가
+        # 계정 관리 영역 (좌측 상단)
+        account_group = QGroupBox("계정 관리")
+        account_layout = QVBoxLayout()
+        account_group.setLayout(account_layout)
+        
+        # 계정 위젯 생성
+        self.account_widget = AccountWidget(self.log, self.monitor_widget)
+        account_layout.addWidget(self.account_widget)
+        
+        # 계정 위젯 시그널 연결
+        self.account_widget.login_success.connect(self.on_login_success)
+        self.account_widget.account_added.connect(self.add_account_to_list)
+        self.account_widget.account_removed.connect(self.remove_account_from_list)
+        self.account_widget.account_selected.connect(self.on_account_selected)
+        
+        # 설정 영역 (좌측 하단)
+        settings_group = QGroupBox("설정")
+        settings_layout = QVBoxLayout()
+        settings_group.setLayout(settings_layout)
+        
+        # 설정 탭 위젯 생성
+        self.settings_tab = ScriptTab(self.log)
+        settings_layout.addWidget(self.settings_tab)
+        
+        # 좌측 레이아웃에 위젯 추가 (비율 6:4)
+        left_layout.addWidget(account_group, 6)
+        left_layout.addWidget(settings_group, 4)
+        
+        # 우측 영역 (모니터링/작업)
+        right_widget = QWidget()
+        right_layout = QVBoxLayout()
+        right_widget.setLayout(right_layout)
+        
+        # 모니터링 영역
+        monitor_group = QGroupBox("모니터링")
+        monitor_layout = QVBoxLayout()
+        monitor_group.setLayout(monitor_layout)
+        
+        # 모니터링 위젯 추가
+        monitor_layout.addWidget(self.monitor_widget)
+        
+        # 우측 레이아웃에 모니터링 그룹 추가
+        right_layout.addWidget(monitor_group)
+        
+        # 메인 레이아웃에 좌우 위젯 추가 (비율 5:5)
+        main_layout.addWidget(left_widget, 5)
+        main_layout.addWidget(right_widget, 5)
+        
+        # 메뉴바 생성
         self.create_menu_bar()
+        
+        # 윈도우 설정
+        self.setWindowTitle("네이버 카페 댓글 프로그램")
+        self.setGeometry(100, 100, 1200, 800)
+        self.setStyleSheet(DARK_STYLE)
 
     def create_menu_bar(self):
         """메뉴바 생성"""
@@ -546,11 +492,11 @@ class MainWindow(QMainWindow):
                 # UI에 계정 추가
                 if not self.account_widget.account_list.findItems(account_id, Qt.MatchExactly):
                     self.account_widget.account_list.addItem(account_id)
-        
+                
         # 작업 목록 복원
         if 'tasks' in settings_data:
             self.tasks = settings_data['tasks']
-            self.update_task_list()
+        self.update_task_list()
         
         # 로그인 필요한 계정들에 대해 로그인 진행
         if accounts_to_login:
@@ -620,6 +566,25 @@ class MainWindow(QMainWindow):
         
         self.log.info("설정이 성공적으로 적용되었습니다.")
         return True
+
+    def on_login_progress(self, message, color):
+        """로그인 진행상황 업데이트"""
+        self.log.add_log(message, color)
+        self.monitor_widget.add_log_message({'message': message, 'color': color})
+    
+    def on_account_login_finished(self, success, headers, account_id):
+        """계정 선택 시 로그인 완료 처리"""
+        if success:
+            # 계정 정보에 헤더 설정
+            self.accounts[account_id]['headers'] = headers
+            
+            # 카페 목록 로드
+            self.load_cafe_list(account_id, headers)
+            
+            self.log.info(f'계정 {account_id} 로그인 성공')
+        else:
+            self.log.error(f'계정 {account_id} 로그인 실패')
+            QMessageBox.warning(self, '로그인 실패', f'계정 "{account_id}"의 로그인에 실패했습니다.\n다른 계정을 선택해주세요.')
 
     def add_account_to_list(self, account_id, password):
         """계정 목록에 계정 추가"""
@@ -735,60 +700,30 @@ class MainWindow(QMainWindow):
             self.monitor_widget.add_log_message({'message': msg, 'color': 'blue'})
 
     def view_task_settings(self, task_id):
-        """작업 설정 상세정보 표시"""
-        # ID로 작업 찾기
+        """작업 설정 보기"""
+        # 작업 찾기
         task = None
         for t in self.tasks:
             if t['id'] == task_id:
                 task = t
                 break
-        
+                
         if not task:
-            QMessageBox.warning(self, '경고', '작업 정보를 찾을 수 없습니다.')
             return
+            
+        # 작업 정보 메시지 생성
+        cafe_info = task['cafe_info']
+        board_info = task['board_info']
         
-        account_id = task['account_id']
-        settings = task['settings']
+        message = f"""
+        <h3>작업 {task_id} 설정</h3>
+        <p><b>계정:</b> {task['account_id']}</p>
+        <p><b>카페:</b> {cafe_info['cafe_name']}</p>
+        <p><b>게시판:</b> {board_info['board_name']}</p>
+        """
         
-        # 이미지 첨부 크기 정보 추가
-        image_width = settings['cafe'].get('image_width', 400)
-        image_height = settings['cafe'].get('image_height', 400)
-        image_size_info = f"{image_width} × {image_height}px" if settings['cafe']['use_image'] else "미사용"
-        
-        # AI 프롬프트 길이 제한
-        prompt = settings['content']['prompt']
-        if len(prompt) > 100:
-            prompt = prompt[:100] + "..."
-        
-        # 콘텐츠 수집 설정 정보
-        use_content_collection = settings['content'].get('use_content_collection', True)
-        content_collection_count = settings['content'].get('content_collection_count', 20)
-        content_collection_info = f"사용 (최근 {content_collection_count}개)" if use_content_collection else "미사용"
-        
-        detail_text = f"""
-작업 {task['id']} 설정 상세정보
-
-[계정 정보]
-- 계정: {account_id}
-
-[카페 설정]
-- 카페: {settings['cafe']['cafe_name']}
-- 게시판: {settings['cafe']['board_name']}
-- 이미지 첨부: {image_size_info}
-- 닉네임 변경: {'사용' if settings['cafe']['use_nickname'] else '미사용'}
-
-[콘텐츠 설정]
-- AI 프롬프트: {prompt}
-- 글자수: {settings['content']['min_length']} ~ {settings['content']['max_length']}
-- 콘텐츠 수집: {content_collection_info}
-
-[댓글 설정]
-- 댓글 사용: {'사용' if settings['reply']['use_reply'] else '미사용'}
-- 닉네임 변경: {'사용' if settings['reply']['use_nickname'] else '미사용'}
-- 댓글 계정: {settings['reply']['account']['id']}
-- 시나리오: {len(settings['reply']['scenario'])}개의 댓글/대댓글
-"""
-        QMessageBox.information(self, '작업 설정 상세정보', detail_text)
+        # 메시지 박스 표시
+        QMessageBox.information(self, f"작업 {task_id} 설정", message)
 
     def remove_account_from_list(self, account_id):
         """계정 목록에서 계정 삭제"""
@@ -1319,78 +1254,49 @@ class MainWindow(QMainWindow):
         self.run_tasks(True)
 
     def add_task(self):
-        """현재 설정으로 새 작업 추가"""
+        """작업 추가"""
+        # 계정 선택 확인
         if not self.account_widget.account_list.currentItem():
             QMessageBox.warning(self, '경고', '계정을 먼저 선택해주세요.')
             return
             
-        account_id = self.account_widget.account_list.currentItem().text()
+        # 현재 선택된 계정 ID
+        account_id = self.account_widget.account_list.currentItem().text().split(' ')[0]  # ✓ 마크 제거
         
-        # 현재 설정 가져오기
-        task_settings = self.settings_tab.get_current_settings()
-        
-        # 작업 ID 생성
-        task_id = len(self.tasks) + 1
-        
-        # 콘텐츠 미리보기 처리
-        content_preview = task_settings['content']['prompt']
-        content_preview = content_preview.replace('\n', ' ').strip()  # 개행을 공백으로 변경
-        if len(content_preview) > 50:  # 50자 제한
-            content_preview = content_preview[:50] + "..."
-        
+        # 계정 로그인 확인
+        if account_id not in self.accounts or self.accounts[account_id]['headers'] is None:
+            QMessageBox.warning(self, '경고', '선택한 계정이 로그인되지 않았습니다.\n계정 검증 후 다시 시도해주세요.')
+            return
+            
+        # 카페 선택 확인
+        if not self.settings_tab.cafe_widget.get_selected_cafe():
+            QMessageBox.warning(self, '경고', '카페를 선택해주세요.')
+            return
+            
+        # 게시판 선택 확인
+        if not self.settings_tab.cafe_widget.get_selected_board():
+            QMessageBox.warning(self, '경고', '게시판을 선택해주세요.')
+            return
+            
         # 작업 정보 생성
-        task = {
+        task_id = len(self.tasks) + 1
+        task_info = {
             'id': task_id,
             'account_id': account_id,
-            'settings': task_settings,
-            'status': 'ready'  # ready, running, completed, error
-        }
-        
-        # task_info 딕셔너리 생성
-        task_info = {
-            'account_id': account_id,
-            'cafe_name': task_settings['cafe']['cafe_name'],
-            'board_name': task_settings['cafe']['board_name'],
-            'content_preview': content_preview
+            'cafe_info': self.settings_tab.cafe_widget.get_selected_cafe(),
+            'board_info': self.settings_tab.cafe_widget.get_selected_board(),
+            'status': '대기 중',
+            'progress': 0,
+            'completed_count': 0,
+            'error_count': 0
         }
         
         # 작업 목록에 추가
-        self.tasks.append(task)
+        self.tasks.append(task_info)
         
-        # UI에 작업 항목 추가
-        item = QListWidgetItem(self.monitor_widget.task_list)
-        task_widget = TaskListItem(task_name="", task_info=task_info, task_number=task_id)
-        item.setSizeHint(task_widget.sizeHint())
-        item.setData(Qt.UserRole, task_id)  # 작업 ID 저장
-        self.monitor_widget.task_list.addItem(item)
-        self.monitor_widget.task_list.setItemWidget(item, task_widget)
+        # 작업 목록 UI 업데이트
+        self.update_task_list()
         
-        # 정보 버튼에 클릭 이벤트 연결
-        task_widget.info_btn.clicked.connect(
-            lambda checked=False, t_id=task_id: self.view_task_settings(t_id)
-        )
-        
-        # 작업 개수 업데이트
-        self.monitor_widget.task_count_label.setText(f"총 {len(self.tasks)}개의 작업")
-        
+        # 로그 메시지
         msg = f'작업 추가됨: 계정 {account_id}, 작업 {task_id}'
         self.monitor_widget.add_log_message({'message': msg, 'color': 'blue'})
-
-    def on_login_progress(self, message, color):
-        """로그인 진행상황 업데이트"""
-        self.log.add_log(message, color)
-        self.monitor_widget.add_log_message({'message': message, 'color': color})
-
-    def on_account_login_finished(self, success, headers, account_id):
-        """계정 선택 시 로그인 완료 처리"""
-        if success:
-            # 계정 정보에 헤더 설정
-            self.accounts[account_id]['headers'] = headers
-            
-            # 카페 목록 로드
-            self.load_cafe_list(account_id, headers)
-            
-            self.log.info(f'계정 {account_id} 로그인 성공')
-        else:
-            self.log.error(f'계정 {account_id} 로그인 실패')
-            QMessageBox.warning(self, '로그인 실패', f'계정 "{account_id}"의 로그인에 실패했습니다.\n다른 계정을 선택해주세요.')

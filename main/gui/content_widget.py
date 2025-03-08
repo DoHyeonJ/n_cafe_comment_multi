@@ -72,7 +72,7 @@ class ContentWidget(QWidget):
         pass
 
     def get_settings(self):
-        """현재 설정값 반환"""
+        """콘텐츠 설정 정보 반환"""
         return {
             'prompt': self.prompt.toPlainText(),
             'min_length': self.min_length.value(),
