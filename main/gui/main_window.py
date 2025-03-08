@@ -714,12 +714,33 @@ class MainWindow(QMainWindow):
         # 작업 정보 메시지 생성
         cafe_info = task['cafe_info']
         board_info = task['board_info']
+        cafe_settings = task['cafe_settings']
+        comment_settings = task['comment_settings']
+        
+        # 댓글 간격 정보
+        interval = comment_settings.get('interval', {})
+        interval_min = interval.get('min', 0)
+        interval_max = interval.get('max', 0)
+        
+        # 댓글 프롬프트 (너무 길면 잘라서 표시)
+        prompt = comment_settings.get('prompt', '')
+        if len(prompt) > 100:
+            prompt = prompt[:100] + "..."
         
         message = f"""
         <h3>작업 {task_id} 설정</h3>
         <p><b>계정:</b> {task['account_id']}</p>
         <p><b>카페:</b> {cafe_info['cafe_name']}</p>
         <p><b>게시판:</b> {board_info['board_name']}</p>
+        <hr>
+        <p><b>게시판별 수집 게시글 수:</b> {cafe_settings.get('post_count', 0)}개</p>
+        <p><b>게시글별 댓글 작업 수:</b> {cafe_settings.get('comment_count', {}).get('min', 0)}~{cafe_settings.get('comment_count', {}).get('max', 0)}개 (랜덤)</p>
+        <p><b>게시글별 좋아요 작업 수:</b> {cafe_settings.get('like_count', {}).get('min', 0)}~{cafe_settings.get('like_count', {}).get('max', 0)}개 (랜덤)</p>
+        <p><b>IP 테더링 사용:</b> {'예' if cafe_settings.get('use_ip_tethering', False) else '아니오'}</p>
+        <hr>
+        <p><b>댓글 간격:</b> {interval_min}~{interval_max}초 (랜덤)</p>
+        <p><b>주요 키워드 사용:</b> {'예' if comment_settings.get('use_keywords', False) else '아니오'}</p>
+        <p><b>AI 프롬프트:</b> {prompt}</p>
         """
         
         # 메시지 박스 표시
@@ -1285,6 +1306,8 @@ class MainWindow(QMainWindow):
             'account_id': account_id,
             'cafe_info': self.settings_tab.cafe_widget.get_selected_cafe(),
             'board_info': self.settings_tab.cafe_widget.get_selected_board(),
+            'cafe_settings': self.settings_tab.cafe_widget.get_settings(),
+            'comment_settings': self.settings_tab.comment_widget.get_settings(),
             'status': '대기 중',
             'progress': 0,
             'completed_count': 0,
