@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                            QLineEdit, QPushButton, QMessageBox, QListWidget,
                            QFileDialog, QDialog, QInputDialog, QProgressDialog)
-from PyQt5.QtCore import pyqtSignal, QThread, Qt
+from PyQt5.QtCore import pyqtSignal, QThread, Qt, QTimer
 from ..api.auth import NaverAuth
 import traceback
 import pandas as pd
@@ -650,54 +650,95 @@ class AccountWidget(QWidget):
         reply = QMessageBox.question(
             self,
             '일괄 검증 확인',
-            f'모든 계정({self.account_list.count()}개)의 로그인을 검증하시겠습니까?\n이 작업은 시간이 걸릴 수 있습니다.',
+            f'모든 계정({self.account_list.count()}개)의 로그인을 순차적으로 검증하시겠습니까?\n이 작업은 시간이 걸릴 수 있습니다.',
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
         
         if reply == QMessageBox.Yes:
             # 진행 상태 대화상자 생성
-            progress = QProgressDialog("계정 검증 중...", "취소", 0, self.account_list.count(), self)
-            progress.setWindowTitle("계정 일괄 검증")
-            progress.setWindowModality(Qt.WindowModal)
-            progress.setMinimumDuration(0)
-            progress.show()
+            self.progress_dialog = QProgressDialog("계정 검증 중...", "취소", 0, self.account_list.count(), self)
+            self.progress_dialog.setWindowTitle("계정 일괄 검증")
+            self.progress_dialog.setWindowModality(Qt.WindowModal)
+            self.progress_dialog.setAutoClose(True)
+            self.progress_dialog.setAutoReset(True)
+            self.progress_dialog.setCancelButton(None)  # 취소 버튼 비활성화
+            self.progress_dialog.setMinimumDuration(0)
+            self.progress_dialog.show()
             
             # MainWindow 참조 가져오기
-            main_window = self.parent()
+            self.main_window = self.parent()
             
+            # 검증할 계정 목록 생성
+            self.accounts_to_verify = []
             for i in range(self.account_list.count()):
-                if progress.wasCanceled():
-                    break
-                    
                 account_id = self.account_list.item(i).text().split(' ')[0]  # ✓ 또는 ✗ 마크 제거
-                progress.setLabelText(f"계정 검증 중: {account_id}")
-                progress.setValue(i)
-                
                 # 이미 검증된 계정은 건너뛰기
-                if account_id in self.verified_accounts:
-                    continue
-                
-                # 계정 비밀번호 가져오기
-                password = None
-                
-                # 내부 저장된 비밀번호 확인
-                if account_id in self.account_passwords:
-                    password = self.account_passwords[account_id]
-                else:
-                    # MainWindow에서 비밀번호 가져오기
-                    if hasattr(main_window, 'accounts') and account_id in main_window.accounts:
-                        password = main_window.accounts[account_id]['pw']
-                
-                if password:
-                    self.start_login(account_id, password)
-                else:
-                    self.log.error(f"계정 '{account_id}'의 비밀번호를 찾을 수 없습니다.")
-                
-                # UI 업데이트를 위한 지연
-                QApplication.processEvents()
+                if account_id not in self.verified_accounts:
+                    self.accounts_to_verify.append(account_id)
             
-            progress.setValue(self.account_list.count())
+            # 현재 진행 중인 계정 인덱스
+            self.current_verify_index = 0
+            
+            # 첫 번째 계정 검증 시작
+            self.verify_next_account()
+    
+    def verify_next_account(self):
+        """다음 계정 검증"""
+        # 모든 계정 검증 완료 확인
+        if self.current_verify_index >= len(self.accounts_to_verify):
+            self.progress_dialog.setValue(self.account_list.count())
+            self.log.info(f"모든 계정 검증이 완료되었습니다.")
+            return
+        
+        # 현재 계정 가져오기
+        account_id = self.accounts_to_verify[self.current_verify_index]
+        
+        # 진행 상태 업데이트
+        self.progress_dialog.setValue(self.current_verify_index)
+        self.progress_dialog.setLabelText(f"계정 검증 중: {account_id} ({self.current_verify_index + 1}/{len(self.accounts_to_verify)})")
+        
+        # TODO: USB 테더링을 통한 IP 변경 기능 추가
+        # 각 계정 로그인 전에 IP를 변경하여 보안 강화
+        # change_ip_via_usb_tethering()
+        
+        # 계정 비밀번호 가져오기
+        password = None
+        if account_id in self.account_passwords:
+            password = self.account_passwords[account_id]
+        else:
+            if hasattr(self.main_window, 'accounts') and account_id in self.main_window.accounts:
+                password = self.main_window.accounts[account_id]['pw']
+        
+        if password:
+            self.log.info(f"계정 '{account_id}'의 로그인을 시도합니다.")
+            
+            # 로그인 워커 생성 및 시그널 연결
+            worker = LoginWorker(account_id, password)
+            worker.progress.connect(self.on_login_progress)
+            
+            # 로그인 완료 시 다음 계정 검증으로 넘어가는 콜백 추가
+            worker.finished.connect(lambda success, headers: self.on_verify_login_finished(success, headers, account_id, password))
+            
+            # 워커 목록에 추가하고 시작
+            self.login_workers.append(worker)
+            worker.start()
+        else:
+            self.log.error(f"계정 '{account_id}'의 비밀번호를 찾을 수 없습니다.")
+            # 다음 계정으로 진행
+            self.current_verify_index += 1
+            QTimer.singleShot(500, self.verify_next_account)
+    
+    def on_verify_login_finished(self, success, headers, username, password):
+        """일괄 검증 시 로그인 완료 처리"""
+        # 기존 로그인 완료 처리 호출
+        self.on_login_finished(success, headers, username, password)
+        
+        # 다음 계정으로 진행
+        self.current_verify_index += 1
+        
+        # 약간의 지연 후 다음 계정 검증 (UI 업데이트 및 네트워크 부하 방지)
+        QTimer.singleShot(2000, self.verify_next_account)
 
     def update_account_item_style(self, item):
         """계정 아이템의 스타일 업데이트"""

@@ -173,12 +173,12 @@ class CommentSettingWidget(QWidget):
             }
         """)
         
-        keyword_desc = QLabel("AI가 게시글 본문에서 주요 키워드를 추출하여\n댓글에 자연스럽게 포함시킵니다.")
-        keyword_desc.setStyleSheet("color: #aaaaaa; font-style: italic;")
-        keyword_desc.setWordWrap(True)
+        # keyword_desc = QLabel("AI가 게시글 본문에서 주요 키워드를 추출하여\n댓글에 자연스럽게 포함시킵니다.")
+        # keyword_desc.setStyleSheet("color: #aaaaaa; font-style: italic;")
+        # keyword_desc.setWordWrap(True)
         
         keyword_layout.addWidget(self.use_keywords)
-        keyword_layout.addWidget(keyword_desc)
+        # keyword_layout.addWidget(keyword_desc)
         keyword_group.setLayout(keyword_layout)
         
         # 메인 레이아웃에 추가

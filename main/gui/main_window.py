@@ -29,159 +29,181 @@ class TaskListItem(QWidget):
         
         # 왼쪽 상태 표시 바 & 번호
         left_container = QWidget()
-        left_layout = QHBoxLayout(left_container)
+        left_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(8)
+        left_layout.setSpacing(2)
         
+        # 작업 번호
+        self.number_label = QLabel(f"#{task_number}")
+        self.number_label.setStyleSheet("""
+            color: #5c85d6;
+            font-size: 14px;
+            font-weight: bold;
+        """)
+        
+        # 상태 표시 바
         self.status_bar = QWidget()
         self.status_bar.setFixedWidth(4)
+        self.status_bar.setMinimumHeight(40)
         self.status_bar.setStyleSheet("""
-            background-color: #4CAF50;
+            background-color: #5c85d6;
             border-radius: 2px;
         """)
         
-        # 작업 번호
-        number_label = QLabel(f"#{task_number}")
-        number_label.setStyleSheet("""
-            color: #666666;
-            font-size: 12px;
-            min-width: 30px;
-        """)
+        left_layout.addWidget(self.number_label, alignment=Qt.AlignCenter)
+        left_layout.addWidget(self.status_bar, alignment=Qt.AlignCenter)
+        left_container.setLayout(left_layout)
         
-        left_layout.addWidget(self.status_bar)
-        left_layout.addWidget(number_label)
-        
-        # 작업 정보 컨테이너
+        # 중앙 정보 영역
         info_container = QWidget()
-        info_layout = QVBoxLayout(info_container)
+        info_layout = QVBoxLayout()
         info_layout.setContentsMargins(0, 0, 0, 0)
         info_layout.setSpacing(4)
         
-        # 계정 & 카페 정보
-        header_layout = QHBoxLayout()
-        header_layout.setSpacing(6)
+        # 계정 및 카페 정보
+        account_cafe_layout = QHBoxLayout()
+        account_cafe_layout.setContentsMargins(0, 0, 0, 0)
+        account_cafe_layout.setSpacing(10)
         
-        # 헤더 정보를 담을 컨테이너
-        header_container = QWidget()
-        header_container.setFixedHeight(30)
-        header_container_layout = QHBoxLayout(header_container)
-        header_container_layout.setContentsMargins(0, 0, 0, 0)
-        header_container_layout.setSpacing(6)
+        # 계정 정보
+        self.account_label = QLabel(f"계정: {task_info['account_id']}")
+        self.account_label.setStyleSheet("""
+            color: white;
+            font-size: 13px;
+            font-weight: bold;
+        """)
         
-        account_label = QLabel(task_info['account_id'])
-        account_label.setStyleSheet("color: #5c85d6; font-weight: bold;")
+        # 카페 정보
+        self.cafe_label = QLabel(f"카페: {task_info['cafe_name']}")
+        self.cafe_label.setStyleSheet("""
+            color: white;
+            font-size: 13px;
+        """)
         
-        separator_style = "color: #666666;"
-        separator1 = QLabel("›")
-        separator1.setStyleSheet(separator_style)
-        separator2 = QLabel("›")
-        separator2.setStyleSheet(separator_style)
+        # 게시판 정보
+        self.board_label = QLabel(f"게시판: {task_info['board_name']}")
+        self.board_label.setStyleSheet("""
+            color: white;
+            font-size: 13px;
+        """)
         
-        cafe_label = QLabel(task_info['cafe_name'])
-        cafe_label.setStyleSheet("color: #cccccc;")
-        
-        board_label = QLabel(task_info['board_name'])
-        board_label.setStyleSheet("color: #999999;")
-        
-        header_container_layout.addWidget(account_label)
-        header_container_layout.addWidget(separator1)
-        header_container_layout.addWidget(cafe_label)
-        header_container_layout.addWidget(separator2)
-        header_container_layout.addWidget(board_label)
-        header_container_layout.addStretch()
-        
-        # 콘텐츠 미리보기
-        preview_container = QWidget()
-        preview_layout = QVBoxLayout(preview_container)
-        preview_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.preview_label = QLabel(task_info['content_preview'])
-        self.preview_label.setStyleSheet("color: #808080; font-size: 12px;")
-        self.preview_label.setWordWrap(False)  # 한 줄로만 표시
-        self.preview_label.setFixedHeight(20)  # 높이 고정
-        self.preview_label.setTextFormat(Qt.PlainText)  # 일반 텍스트로 설정
-        
-        # 텍스트가 너무 길면 생략 표시
-        metrics = QFontMetrics(self.preview_label.font())
-        elidedText = metrics.elidedText(task_info['content_preview'], Qt.ElideRight, self.preview_label.width() - 10)
-        self.preview_label.setText(elidedText)
-        
-        # 게시글 URL 표시 레이블 (기본적으로 숨김)
-        self.url_label = QLabel()
-        self.url_label.setStyleSheet("color: #5c85d6; font-size: 12px;")
-        self.url_label.setWordWrap(False)
-        self.url_label.setFixedHeight(20)
-        self.url_label.setTextFormat(Qt.RichText)
-        self.url_label.setOpenExternalLinks(True)  # 외부 링크 열기 허용
-        self.url_label.setVisible(False)  # 초기에는 숨김
-        
-        preview_layout.addWidget(self.preview_label)
-        preview_layout.addWidget(self.url_label)
-        
-        info_layout.addWidget(header_container)
-        info_layout.addWidget(preview_container)
-        
-        # 상세보기 버튼 컨테이너
-        button_container = QWidget()
-        button_container.setFixedWidth(90)
-        button_layout = QVBoxLayout(button_container)
-        button_layout.setContentsMargins(0, 0, 0, 0)
-        button_layout.setAlignment(Qt.AlignCenter)
-        
-        self.info_btn = QPushButton("상세보기")
-        self.info_btn.setFixedSize(80, 30)
-        self.info_btn.setCursor(Qt.PointingHandCursor)
+        # 정보 버튼
+        self.info_btn = QPushButton("정보")
         self.info_btn.setStyleSheet("""
             QPushButton {
-                background-color: transparent;
-                color: #5c85d6;
-                border: 1px solid #5c85d6;
-                border-radius: 4px;
-                font-size: 12px;
-                padding: 5px;
-            }
-            QPushButton:hover {
                 background-color: #5c85d6;
                 color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 3px;
+                min-width: 60px;
+            }
+            QPushButton:hover {
+                background-color: #4a6fb8;
             }
         """)
         
-        button_layout.addWidget(self.info_btn)
+        account_cafe_layout.addWidget(self.account_label)
+        account_cafe_layout.addWidget(self.cafe_label)
+        account_cafe_layout.addWidget(self.board_label)
+        account_cafe_layout.addWidget(self.info_btn)
+        account_cafe_layout.addStretch()
         
-        layout.addWidget(left_container)
-        layout.addWidget(info_container)
-        layout.addWidget(button_container)
-        self.setLayout(layout)
+        # 작업 설정 정보
+        settings_layout = QHBoxLayout()
+        settings_layout.setContentsMargins(0, 0, 0, 0)
+        settings_layout.setSpacing(10)
         
-        # 게시글 URL 저장 변수
-        self.post_url = None
-
-    def set_post_url(self, url, title=None):
-        """게시글 URL 설정 및 표시
-        
-        Args:
-            url (str): 게시글 URL
-            title (str, optional): 게시글 제목
-        """
-        self.post_url = url
-        
-        # URL 레이블 업데이트
-        link_text = title if title else "게시글 보기"
-        self.url_label.setText(f'<a href="{url}" style="text-decoration:none;">{link_text}</a>')
-        self.url_label.setVisible(True)
-        
-        # 상태 표시 바 색상 변경 (완료 상태)
-        self.status_bar.setStyleSheet("""
-            background-color: #4CAF50;
-            border-radius: 2px;
+        # 게시글 수집 정보
+        self.post_label = QLabel(f"게시글: {task_info['post_count']}개")
+        self.post_label.setStyleSheet("""
+            color: #cccccc;
+            font-size: 12px;
         """)
         
-        # 미리보기 레이블 텍스트 변경 (게시 완료 표시)
-        self.preview_label.setText("✅ 게시 완료")
-        self.preview_label.setStyleSheet("color: #4CAF50; font-size: 12px; font-weight: bold;")
-
+        # 댓글 작업 정보
+        comment_min = task_info['comment_min']
+        comment_max = task_info['comment_max']
+        self.comment_label = QLabel(f"댓글: {comment_min}~{comment_max}개")
+        self.comment_label.setStyleSheet("""
+            color: #cccccc;
+            font-size: 12px;
+        """)
+        
+        # 좋아요 작업 정보
+        like_min = task_info['like_min']
+        like_max = task_info['like_max']
+        self.like_label = QLabel(f"좋아요: {like_min}~{like_max}개")
+        self.like_label.setStyleSheet("""
+            color: #cccccc;
+            font-size: 12px;
+        """)
+        
+        # 댓글 간격 정보
+        interval_min = task_info['interval_min']
+        interval_max = task_info['interval_max']
+        self.interval_label = QLabel(f"간격: {interval_min}~{interval_max}초")
+        self.interval_label.setStyleSheet("""
+            color: #cccccc;
+            font-size: 12px;
+        """)
+        
+        settings_layout.addWidget(self.post_label)
+        settings_layout.addWidget(self.comment_label)
+        settings_layout.addWidget(self.like_label)
+        settings_layout.addWidget(self.interval_label)
+        settings_layout.addStretch()
+        
+        # 게시글 URL 레이블 (기본적으로 숨김)
+        self.post_url_label = QLabel()
+        self.post_url_label.setStyleSheet("""
+            color: #5c85d6;
+            font-size: 12px;
+        """)
+        self.post_url_label.setTextFormat(Qt.RichText)
+        self.post_url_label.setOpenExternalLinks(True)
+        self.post_url_label.setVisible(False)
+        
+        # 정보 레이아웃에 추가
+        info_layout.addLayout(account_cafe_layout)
+        info_layout.addLayout(settings_layout)
+        info_container.setLayout(info_layout)
+        
+        # 레이아웃에 위젯 추가
+        layout.addWidget(left_container)
+        layout.addWidget(info_container, stretch=1)
+        self.setLayout(layout)
+        
+        # 상태에 따른 스타일 설정
+        self.update_status_style(task_info['status'])
+    
+    def update_status_style(self, status):
+        """상태에 따른 스타일 업데이트"""
+        if status == '실행 중':
+            self.status_bar.setStyleSheet("background-color: #4CAF50; border-radius: 2px;")
+        elif status == '완료':
+            self.status_bar.setStyleSheet("background-color: #2196F3; border-radius: 2px;")
+        elif status == '오류':
+            self.status_bar.setStyleSheet("background-color: #F44336; border-radius: 2px;")
+        elif status == '일시정지':
+            self.status_bar.setStyleSheet("background-color: #FFC107; border-radius: 2px;")
+        else:  # 대기 중
+            self.status_bar.setStyleSheet("background-color: #5c85d6; border-radius: 2px;")
+    
+    def set_post_url(self, url, title=None):
+        """게시글 URL 설정"""
+        if title:
+            self.post_url_label.setText(f"<a href='{url}' style='color: #5c85d6; text-decoration: none;'>{title}</a>")
+        else:
+            self.post_url_label.setText(f"<a href='{url}' style='color: #5c85d6; text-decoration: none;'>{url}</a>")
+        self.post_url_label.setVisible(True)
+        
+        # 상태 업데이트
+        self.update_status_style('완료')
+    
     def sizeHint(self):
-        return QSize(300, 60)
+        """위젯 크기 힌트"""
+        return QSize(600, 70)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -684,20 +706,34 @@ class MainWindow(QMainWindow):
             # 작업 정보 저장
             removed_task = self.tasks[task_to_remove]
             account_id = removed_task['account_id']
+            cafe_name = removed_task['cafe_info']['cafe_name']
+            board_name = removed_task['board_info']['board_name']
             
-            # 작업 삭제
-            self.tasks.pop(task_to_remove)
-            self.monitor_widget.task_list.takeItem(task_idx)
+            # 삭제 확인 대화상자
+            reply = QMessageBox.question(
+                self,
+                '작업 삭제 확인',
+                f'작업 #{task_id}을(를) 삭제하시겠습니까?\n\n계정: {account_id}\n카페: {cafe_name}\n게시판: {board_name}',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No  # 기본값은 No
+            )
             
-            # 작업 ID 재할당
-            for i, task in enumerate(self.tasks, 1):
-                task['id'] = i
-            
-            # UI 업데이트
-            self.update_task_list()
-            
-            msg = f'작업 삭제됨: 계정 {account_id}, 작업 {task_id}'
-            self.monitor_widget.add_log_message({'message': msg, 'color': 'blue'})
+            if reply == QMessageBox.Yes:
+                # 작업 삭제
+                self.tasks.pop(task_to_remove)
+                self.monitor_widget.task_list.takeItem(task_idx)
+                
+                # 작업 ID 재할당
+                for i, task in enumerate(self.tasks, 1):
+                    task['id'] = i
+                
+                # UI 업데이트
+                self.update_task_list()
+                
+                # 로그 메시지
+                msg = f'작업 #{task_id} 삭제됨: 계정 {account_id}, 카페 {cafe_name}, 게시판 {board_name}'
+                self.log.info(msg)
+                self.monitor_widget.add_log_message({'message': msg, 'color': 'red'})
 
     def view_task_settings(self, task_id):
         """작업 설정 보기"""
@@ -717,6 +753,10 @@ class MainWindow(QMainWindow):
         cafe_settings = task['cafe_settings']
         comment_settings = task['comment_settings']
         
+        # 계정 정보 형식 설정
+        account_count = len(task.get('all_accounts', []))
+        account_display = f"{account_count}개 계정"
+        
         # 댓글 간격 정보
         interval = comment_settings.get('interval', {})
         interval_min = interval.get('min', 0)
@@ -728,20 +768,22 @@ class MainWindow(QMainWindow):
             prompt = prompt[:100] + "..."
         
         message = f"""
-        <h3>작업 {task_id} 설정</h3>
-        <p><b>계정:</b> {task['account_id']}</p>
-        <p><b>카페:</b> {cafe_info['cafe_name']}</p>
-        <p><b>게시판:</b> {board_info['board_name']}</p>
-        <hr>
-        <p><b>게시판별 수집 게시글 수:</b> {cafe_settings.get('post_count', 0)}개</p>
-        <p><b>게시글별 댓글 작업 수:</b> {cafe_settings.get('comment_count', {}).get('min', 0)}~{cafe_settings.get('comment_count', {}).get('max', 0)}개 (랜덤)</p>
-        <p><b>게시글별 좋아요 작업 수:</b> {cafe_settings.get('like_count', {}).get('min', 0)}~{cafe_settings.get('like_count', {}).get('max', 0)}개 (랜덤)</p>
-        <p><b>IP 테더링 사용:</b> {'예' if cafe_settings.get('use_ip_tethering', False) else '아니오'}</p>
-        <hr>
-        <p><b>댓글 간격:</b> {interval_min}~{interval_max}초 (랜덤)</p>
-        <p><b>주요 키워드 사용:</b> {'예' if comment_settings.get('use_keywords', False) else '아니오'}</p>
-        <p><b>AI 프롬프트:</b> {prompt}</p>
-        """
+[기본 정보]
+- 계정: {account_display}
+- 카페: {cafe_info['cafe_name']}
+- 게시판: {board_info['board_name']}
+
+[작업 설정]
+- 게시글 수집: {cafe_settings.get('post_count', 0)}개
+- 댓글 작업: {cafe_settings.get('comment_count', {}).get('min', 0)}~{cafe_settings.get('comment_count', {}).get('max', 0)}개 (랜덤)
+- 좋아요 작업: {cafe_settings.get('like_count', {}).get('min', 0)}~{cafe_settings.get('like_count', {}).get('max', 0)}개 (랜덤)
+- IP 테더링: {'사용' if cafe_settings.get('use_ip_tethering', False) else '미사용'}
+
+[댓글 설정]
+- 댓글 간격: {interval_min}~{interval_max}초 (랜덤)
+- 키워드 사용: {'사용' if comment_settings.get('use_keywords', False) else '미사용'}
+- AI 프롬프트: {prompt}
+"""
         
         # 메시지 박스 표시
         QMessageBox.information(self, f"작업 {task_id} 설정", message)
@@ -799,35 +841,55 @@ class MainWindow(QMainWindow):
             self.log.info(f'계정 삭제됨: {account_id}')
 
     def update_task_list(self):
-        """통합 작업 목록 업데이트"""
+        """작업 목록 UI 업데이트"""
+        # 작업 목록 초기화
         self.monitor_widget.task_list.clear()
         
-        # 작업 ID 재할당 (순서 보장)
-        for i, task in enumerate(self.tasks, 1):
-            task['id'] = i
+        # 작업이 없는 경우 메시지 표시
+        if not self.tasks:
+            self.monitor_widget.task_count_label.setText("등록된 작업이 없습니다.")
+            return
         
+        # 작업 목록 업데이트
         for task in self.tasks:
-            account_id = task['account_id']
+            # 계정 정보 형식 설정
+            account_count = len(task.get('all_accounts', []))
+            account_display = f"{account_count}개 계정"
             
-            # 콘텐츠 미리보기 처리
-            content_preview = task['settings']['content']['prompt']
-            content_preview = content_preview.replace('\n', ' ').strip()  # 개행을 공백으로 변경
-            if len(content_preview) > 50:  # 50자 제한
-                content_preview = content_preview[:50] + "..."
+            # 카페 및 게시판 이름 길이 제한 (15자 이상이면 줄임표 표시)
+            cafe_name = task['cafe_info']['cafe_name']
+            if len(cafe_name) > 15:
+                cafe_name = cafe_name[:15] + "..."
+                
+            board_name = task['board_info']['board_name']
+            if len(board_name) > 15:
+                board_name = board_name[:15] + "..."
             
-            # task_info 딕셔너리 생성
+            # 작업 정보 생성
             task_info = {
-                'account_id': account_id,
-                'cafe_name': task['settings']['cafe']['cafe_name'],
-                'board_name': task['settings']['cafe']['board_name'],
-                'content_preview': content_preview
+                'account_id': account_display,
+                'cafe_name': cafe_name,
+                'board_name': board_name,
+                'status': task.get('status', '대기 중'),
+                'progress': task.get('progress', 0),
+                'completed_count': task.get('completed_count', 0),
+                'error_count': task.get('error_count', 0),
+                'post_count': task['cafe_settings'].get('post_count', 0),
+                'comment_min': task['cafe_settings'].get('comment_count', {}).get('min', 0),
+                'comment_max': task['cafe_settings'].get('comment_count', {}).get('max', 0),
+                'like_min': task['cafe_settings'].get('like_count', {}).get('min', 0),
+                'like_max': task['cafe_settings'].get('like_count', {}).get('max', 0),
+                'interval_min': task['comment_settings'].get('interval', {}).get('min', 0),
+                'interval_max': task['comment_settings'].get('interval', {}).get('max', 0)
             }
             
+            # 작업 항목 생성
             item = QListWidgetItem(self.monitor_widget.task_list)
-            task_widget = TaskListItem(task_name="", task_info=task_info, task_number=task['id'])
+            task_widget = TaskListItem("", task_info, task['id'])
             item.setSizeHint(task_widget.sizeHint())
-            # 작업 ID를 아이템의 데이터로 저장
-            item.setData(Qt.UserRole, task['id'])
+            item.setData(Qt.UserRole, task['id'])  # 작업 ID 저장
+            
+            # 작업 항목 추가
             self.monitor_widget.task_list.addItem(item)
             self.monitor_widget.task_list.setItemWidget(item, task_widget)
             
@@ -1282,37 +1344,77 @@ class MainWindow(QMainWindow):
             return
             
         # 현재 선택된 계정 ID
-        account_id = self.account_widget.account_list.currentItem().text().split(' ')[0]  # ✓ 마크 제거
+        selected_account_id = self.account_widget.account_list.currentItem().text().split(' ')[0]  # ✓ 마크 제거
         
-        # 계정 로그인 확인
-        if account_id not in self.accounts or self.accounts[account_id]['headers'] is None:
+        # 선택된 계정 로그인 확인
+        if selected_account_id not in self.accounts or self.accounts[selected_account_id]['headers'] is None:
             QMessageBox.warning(self, '경고', '선택한 계정이 로그인되지 않았습니다.\n계정 검증 후 다시 시도해주세요.')
             return
             
         # 카페 선택 확인
-        if not self.settings_tab.cafe_widget.get_selected_cafe():
+        selected_cafe = self.settings_tab.cafe_widget.get_selected_cafe()
+        if not selected_cafe:
             QMessageBox.warning(self, '경고', '카페를 선택해주세요.')
             return
             
         # 게시판 선택 확인
-        if not self.settings_tab.cafe_widget.get_selected_board():
-            QMessageBox.warning(self, '경고', '게시판을 선택해주세요.')
-            return
+        selected_board = self.settings_tab.cafe_widget.get_selected_board()
+        if not selected_board:
+            # 게시판이 선택되지 않은 경우, 첫 번째 게시판을 선택
+            if self.settings_tab.cafe_widget.board_combo.count() > 0:
+                self.settings_tab.cafe_widget.board_combo.setCurrentIndex(0)
+                selected_board = self.settings_tab.cafe_widget.get_selected_board()
+                if not selected_board:
+                    QMessageBox.warning(self, '경고', '게시판을 선택해주세요.')
+                    return
+            else:
+                QMessageBox.warning(self, '경고', '게시판을 선택해주세요.')
+                return
             
-        # 작업 정보 생성
+        # 카페 설정 가져오기
+        cafe_settings = self.settings_tab.cafe_widget.get_settings()
+        
+        # 댓글 설정 가져오기
+        comment_settings = self.settings_tab.comment_widget.get_settings()
+        
+        # 댓글 프롬프트 확인
+        if not comment_settings.get('prompt', '').strip():
+            reply = QMessageBox.question(
+                self,
+                'AI 프롬프트 확인',
+                'AI 프롬프트가 비어있습니다. 계속 진행하시겠습니까?',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                return
+        
+        # 작업 ID 생성
         task_id = len(self.tasks) + 1
+        
+        # 모든 계정 정보 수집 (검증 여부와 관계없이 모든 계정)
+        all_accounts = list(self.accounts.keys())
+        
+        # 작업 정보 생성
         task_info = {
             'id': task_id,
-            'account_id': account_id,
-            'cafe_info': self.settings_tab.cafe_widget.get_selected_cafe(),
-            'board_info': self.settings_tab.cafe_widget.get_selected_board(),
-            'cafe_settings': self.settings_tab.cafe_widget.get_settings(),
-            'comment_settings': self.settings_tab.comment_widget.get_settings(),
+            'account_id': selected_account_id,  # 주 계정 ID
+            'all_accounts': all_accounts,  # 모든 계정 ID 목록
+            'cafe_info': selected_cafe,
+            'board_info': selected_board,
+            'cafe_settings': cafe_settings,
+            'comment_settings': comment_settings,
             'status': '대기 중',
             'progress': 0,
             'completed_count': 0,
-            'error_count': 0
+            'error_count': 0,
+            'created_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'last_updated': time.strftime('%Y-%m-%d %H:%M:%S')
         }
+        
+        # 계정 수 계산
+        account_count = len(all_accounts)
+        account_display = f"{account_count}개 계정"
         
         # 작업 목록에 추가
         self.tasks.append(task_info)
@@ -1321,5 +1423,9 @@ class MainWindow(QMainWindow):
         self.update_task_list()
         
         # 로그 메시지
-        msg = f'작업 추가됨: 계정 {account_id}, 작업 {task_id}'
+        msg = f'작업 추가됨: 계정 {account_display}, 카페 {selected_cafe["cafe_name"]}, 게시판 {selected_board["board_name"]}'
+        self.log.info(msg)
         self.monitor_widget.add_log_message({'message': msg, 'color': 'blue'})
+        
+        # 작업 추가 성공 메시지
+        QMessageBox.information(self, '작업 추가 완료', f'작업 #{task_id}이(가) 성공적으로 추가되었습니다.')
