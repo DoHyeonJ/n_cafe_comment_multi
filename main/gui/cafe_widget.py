@@ -206,70 +206,10 @@ class CafeWidget(QWidget):
         self.like_count_spin.valueChanged.connect(self.update_like_range_info)
         self.like_range_spin.valueChanged.connect(self.update_like_range_info)
         
-        # 4. IP 테더링 사용
-        ip_tethering_layout = QHBoxLayout()
-        
-        self.ip_tethering_check = QCheckBox("IP 테더링 사용")
-        self.ip_tethering_check.setChecked(True)
-        self.ip_tethering_check.setStyleSheet("""
-            QCheckBox {
-                color: white;
-                spacing: 5px;
-            }
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-            }
-            QCheckBox::indicator:unchecked {
-                border: 1px solid #5c85d6;
-                background: #2b2b2b;
-            }
-            QCheckBox::indicator:checked {
-                border: 1px solid #5c85d6;
-                background: #5c85d6;
-            }
-        """)
-        
-        self.verify_ip_btn = QPushButton("테더링 검증")
-        self.verify_ip_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #5c85d6;
-                color: white;
-                border: none;
-                padding: 10px 10px;
-                border-radius: 4px;
-                min-width: 80px;
-            }
-            QPushButton:hover {
-                background-color: #4a6fb8;
-            }
-            QPushButton:disabled {
-                background-color: #555555;
-                color: #aaaaaa;
-            }
-        """)
-        self.verify_ip_btn.clicked.connect(self.verify_ip_tethering)
-        
-        ip_status_label = QLabel("상태:")
-        ip_status_label.setStyleSheet("color: white;")
-        
-        self.ip_status = QLabel("미검증")
-        self.ip_status.setStyleSheet("color: #FFA500; font-weight: bold;")
-        
-        ip_tethering_layout.addWidget(self.ip_tethering_check)
-        ip_tethering_layout.addWidget(self.verify_ip_btn)
-        ip_tethering_layout.addWidget(ip_status_label)
-        ip_tethering_layout.addWidget(self.ip_status)
-        ip_tethering_layout.addStretch()
-        
-        # IP 테더링 체크박스 상태 변경 시 검증 버튼 활성화/비활성화
-        self.ip_tethering_check.stateChanged.connect(self.update_ip_verify_button)
-        
         # 작업 설정 레이아웃에 추가
         work_layout.addLayout(post_count_layout)
         work_layout.addLayout(comment_count_layout)
         work_layout.addLayout(like_count_layout)
-        work_layout.addLayout(ip_tethering_layout)
         
         work_settings.setLayout(work_layout)
         
@@ -284,7 +224,6 @@ class CafeWidget(QWidget):
         # 초기 범위 정보 업데이트
         self.update_comment_range_info()
         self.update_like_range_info()
-        self.update_ip_verify_button()
     
     def update_comment_range_info(self):
         """댓글 범위 정보 업데이트"""
@@ -319,24 +258,6 @@ class CafeWidget(QWidget):
                     if isinstance(widget, QLabel) and "(2~4 랜덤)" in widget.text():
                         widget.setText(f"({min_val}~{max_val} 랜덤)")
                         return
-    
-    def update_ip_verify_button(self):
-        """IP 테더링 체크박스 상태에 따라 검증 버튼 활성화/비활성화"""
-        self.verify_ip_btn.setEnabled(self.ip_tethering_check.isChecked())
-        if not self.ip_tethering_check.isChecked():
-            self.ip_status.setText("미사용")
-            self.ip_status.setStyleSheet("color: #aaaaaa; font-weight: bold;")
-        else:
-            self.ip_status.setText("미검증")
-            self.ip_status.setStyleSheet("color: #FFA500; font-weight: bold;")
-    
-    def verify_ip_tethering(self):
-        """IP 테더링 검증 (실제 구현은 추후에)"""
-        # 실제 구현은 추후에 진행
-        # 임시로 검증 성공으로 처리
-        self.ip_status.setText("검증 완료")
-        self.ip_status.setStyleSheet("color: #4CAF50; font-weight: bold;")
-        self.log.info("IP 테더링 검증이 완료되었습니다.")
     
     def update_cafe_list(self, cafe_list, headers):
         """카페 목록 업데이트"""
@@ -461,9 +382,7 @@ class CafeWidget(QWidget):
                 'range': like_range,
                 'min': like_min,
                 'max': like_max
-            },
-            'use_ip_tethering': self.ip_tethering_check.isChecked(),
-            'ip_verified': self.ip_status.text() == "검증 완료"
+            }
         }
     
     def load_settings(self, settings):
@@ -492,16 +411,6 @@ class CafeWidget(QWidget):
         like_count = settings.get('like_count', {})
         self.like_count_spin.setValue(like_count.get('base', 3))
         self.like_range_spin.setValue(like_count.get('range', 1))
-        
-        # IP 테더링 설정
-        self.ip_tethering_check.setChecked(settings.get('use_ip_tethering', True))
-        
-        # IP 검증 상태 설정
-        if settings.get('ip_verified', False):
-            self.ip_status.setText("검증 완료")
-            self.ip_status.setStyleSheet("color: #4CAF50; font-weight: bold;")
-        else:
-            self.update_ip_verify_button()
     
     def clear_settings(self):
         """설정 초기화"""
@@ -518,7 +427,4 @@ class CafeWidget(QWidget):
         self.comment_count_spin.setValue(5)
         self.comment_range_spin.setValue(2)
         self.like_count_spin.setValue(3)
-        self.like_range_spin.setValue(1)
-        self.ip_tethering_check.setChecked(True)
-        self.ip_status.setText("미검증")
-        self.ip_status.setStyleSheet("color: #FFA500; font-weight: bold;") 
+        self.like_range_spin.setValue(1) 

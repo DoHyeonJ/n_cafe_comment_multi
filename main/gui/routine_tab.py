@@ -6,6 +6,7 @@ from .styles import DARK_STYLE
 from datetime import datetime
 from PyQt5.QtCore import Qt, pyqtSignal
 from main.api.ai_generator import AIGenerator
+from main.api.ip_manage import change_ip, get_current_ip, is_tethering_enabled, toggle_usb_tethering
 from ..utils.log import Log
 
 class RoutineTab(BaseMonitorWidget):
@@ -273,6 +274,74 @@ class RoutineTab(BaseMonitorWidget):
         interval_layout.addWidget(self.repeat_checkbox)
         interval_layout.addStretch()
 
+        # IP 테더링 설정 추가
+        ip_tethering_group = QWidget()
+        ip_tethering_layout = QVBoxLayout(ip_tethering_group)
+        ip_tethering_layout.setContentsMargins(0, 0, 0, 0)
+        ip_tethering_layout.setSpacing(8)
+        
+        # IP 테더링 체크박스
+        self.ip_tethering_checkbox = QCheckBox("IP 테더링 사용")
+        self.ip_tethering_checkbox.setStyleSheet(self.repeat_checkbox.styleSheet())
+        self.ip_tethering_checkbox.toggled.connect(self.on_ip_tethering_toggled)
+        
+        # IP 테더링 상태 컨테이너
+        ip_status_container = QWidget()
+        ip_status_layout = QHBoxLayout(ip_status_container)
+        ip_status_layout.setContentsMargins(0, 0, 0, 0)
+        ip_status_layout.setSpacing(8)
+        
+        # 현재 IP 표시 레이블
+        ip_label = QLabel("현재 IP:")
+        ip_label.setStyleSheet("color: white;")
+        self.current_ip_label = QLabel("확인 중...")
+        self.current_ip_label.setStyleSheet("""
+            QLabel {
+                color: #5c85d6;
+                background-color: #2b2b2b;
+                border: 1px solid #3d3d3d;
+                padding: 5px;
+                border-radius: 4px;
+            }
+        """)
+        
+        # IP 검증 버튼
+        self.validate_ip_btn = QPushButton("IP 변경 검증")
+        self.validate_ip_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #5c85d6;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 5px 10px;
+            }
+            QPushButton:hover {
+                background-color: #4a6fb8;
+            }
+            QPushButton:disabled {
+                background-color: #555555;
+                color: #aaaaaa;
+            }
+        """)
+        self.validate_ip_btn.clicked.connect(self.validate_ip_change)
+        self.validate_ip_btn.setEnabled(False)  # 초기에는 비활성화
+        
+        # IP 검증 상태 표시 레이블
+        self.ip_status = QLabel("")
+        self.ip_status.setStyleSheet("color: #808080; margin-left: 5px;")
+        
+        ip_status_layout.addWidget(ip_label)
+        ip_status_layout.addWidget(self.current_ip_label, stretch=1)
+        ip_status_layout.addWidget(self.validate_ip_btn)
+        ip_status_layout.addWidget(self.ip_status)
+        
+        ip_tethering_layout.addWidget(self.ip_tethering_checkbox)
+        ip_tethering_layout.addWidget(ip_status_container)
+        
+        # IP 상태 컨테이너 초기에 숨기기
+        ip_status_container.setVisible(False)
+        self.ip_status_container = ip_status_container  # 참조 저장
+
         # API Key 설정
         api_group = QWidget()
         api_layout = QHBoxLayout(api_group)
@@ -325,6 +394,7 @@ class RoutineTab(BaseMonitorWidget):
 
         # 설정 영역에 위젯 추가
         settings_layout.addWidget(interval_group)
+        settings_layout.addWidget(ip_tethering_group)  # IP 테더링 설정 추가
         settings_layout.addWidget(api_group)
         settings_group.setLayout(settings_layout)
         
@@ -677,8 +747,7 @@ class RoutineTab(BaseMonitorWidget):
             'min_interval': self.min_interval.value(),
             'max_interval': self.max_interval.value(),
             'repeat': self.repeat_checkbox.isChecked(),
-            'api_key': self.api_key_input.text().strip(),
-            'prevent_duplicate': self.prevent_duplicate_check.isChecked()
+            'api_key': self.api_key_input.text().strip()
         }
 
     def load_settings(self, settings):
@@ -690,4 +759,76 @@ class RoutineTab(BaseMonitorWidget):
         self.max_interval.setValue(settings.get('max_interval', 15))
         self.repeat_checkbox.setChecked(settings.get('repeat', True))
         self.api_key_input.setText(settings.get('api_key', ''))
-        self.prevent_duplicate_check.setChecked(settings.get('prevent_duplicate', True)) 
+
+    def on_ip_tethering_toggled(self, checked):
+        """IP 테더링 체크박스 상태 변경 시 호출되는 메서드"""
+        self.ip_status_container.setVisible(checked)
+        self.validate_ip_btn.setEnabled(checked)
+        
+        if checked:
+            # 현재 IP 표시
+            self.update_current_ip()
+            # 테더링 상태 확인
+            if not is_tethering_enabled():
+                reply = QMessageBox.question(
+                    self, 
+                    "테더링 활성화 필요", 
+                    "테더링이 활성화되어 있지 않습니다. 활성화하시겠습니까?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes
+                )
+                
+                if reply == QMessageBox.Yes:
+                    # 테더링 활성화
+                    toggle_usb_tethering(True)
+                    self.log.info("USB 테더링이 활성화되었습니다.")
+        else:
+            # IP 상태 초기화
+            self.ip_status.setText("")
+            
+        # 로그 메시지 추가
+        self.log.info(f"IP 테더링 사용: {'활성화' if checked else '비활성화'}")
+    
+    def update_current_ip(self):
+        """현재 IP 주소 업데이트"""
+        try:
+            current_ip = get_current_ip()
+            self.current_ip_label.setText(current_ip)
+            return current_ip
+        except Exception as e:
+            self.current_ip_label.setText("알 수 없음")
+            self.log.error(f"IP 조회 중 오류 발생: {str(e)}")
+            return None
+    
+    def validate_ip_change(self):
+        """IP 변경 검증 버튼 클릭 시 호출되는 메서드"""
+        # 검증 중 UI 업데이트
+        self.validate_ip_btn.setEnabled(False)
+        self.ip_status.setText("검증 중...")
+        self.ip_status.setStyleSheet("color: #5c85d6;")
+        
+        try:
+            # IP 변경 시도
+            is_changed, old_ip, new_ip = change_ip()
+            
+            # 현재 IP 업데이트
+            self.current_ip_label.setText(new_ip)
+            
+            if is_changed:
+                self.ip_status.setText("✓ 검증 완료")
+                self.ip_status.setStyleSheet("color: #4CAF50;")
+                self.log.info(f"IP 변경 성공: {old_ip} → {new_ip}")
+            else:
+                self.ip_status.setText("✗ 검증 실패")
+                self.ip_status.setStyleSheet("color: #d65c5c;")
+                self.log.error(f"IP 변경 실패: {old_ip} → {new_ip}")
+                QMessageBox.warning(self, "IP 변경 실패", "IP 주소가 변경되지 않았습니다. 테더링 설정을 확인해주세요.")
+        except Exception as e:
+            self.ip_status.setText("✗ 오류 발생")
+            self.ip_status.setStyleSheet("color: #d65c5c;")
+            error_msg = f"IP 변경 중 오류 발생: {str(e)}"
+            self.log.error(error_msg)
+            QMessageBox.critical(self, "IP 변경 오류", error_msg)
+        
+        # 검증 완료 후 UI 업데이트
+        self.validate_ip_btn.setEnabled(True) 

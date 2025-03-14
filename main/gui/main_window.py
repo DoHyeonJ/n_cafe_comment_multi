@@ -120,13 +120,11 @@ class TaskDetailDialog(QDialog):
         comment_max = cafe_settings.get('comment_count', {}).get('max', 0)
         like_min = cafe_settings.get('like_count', {}).get('min', 0)
         like_max = cafe_settings.get('like_count', {}).get('max', 0)
-        use_tethering = '사용' if cafe_settings.get('use_ip_tethering', False) else '미사용'
         
         # 작업 설정 추가
         task_layout.addRow("게시글 수집:", QLabel(f"{post_count}개"))
         task_layout.addRow("댓글 작업:", QLabel(f"{comment_min}~{comment_max}개 (랜덤)"))
         task_layout.addRow("좋아요 작업:", QLabel(f"{like_min}~{like_max}개 (랜덤)"))
-        task_layout.addRow("IP 테더링:", QLabel(use_tethering))
         task_group.setLayout(task_layout)
         
         # 댓글 설정 그룹
@@ -676,7 +674,7 @@ class MainWindow(QMainWindow):
         
         # 윈도우 설정
         self.setWindowTitle("네이버 카페 댓글 프로그램")
-        self.setGeometry(100, 100, 1200, 800)
+        self.setGeometry(100, 100, 1200, 900)
         self.setStyleSheet(DARK_STYLE)
 
     def create_menu_bar(self):
@@ -1056,7 +1054,6 @@ class MainWindow(QMainWindow):
 - 게시글 수집: {cafe_settings.get('post_count', 0)}개
 - 댓글 작업: {cafe_settings.get('comment_count', {}).get('min', 0)}~{cafe_settings.get('comment_count', {}).get('max', 0)}개 (랜덤)
 - 좋아요 작업: {cafe_settings.get('like_count', {}).get('min', 0)}~{cafe_settings.get('like_count', {}).get('max', 0)}개 (랜덤)
-- IP 테더링: {'사용' if cafe_settings.get('use_ip_tethering', False) else '미사용'}
 
 [댓글 설정]
 - 댓글 간격: {interval_min}~{interval_max}초 (랜덤)
@@ -1659,6 +1656,12 @@ class MainWindow(QMainWindow):
             
         # 카페 설정 가져오기
         cafe_settings = self.settings_tab.cafe_widget.get_settings()
+        
+        # IP 테더링 정보 제외
+        if 'use_ip_tethering' in cafe_settings:
+            del cafe_settings['use_ip_tethering']
+        if 'ip_verified' in cafe_settings:
+            del cafe_settings['ip_verified']
         
         # 댓글 설정 가져오기 (프롬프트 목록과 중복방지 설정 포함)
         full_comment_settings = self.settings_tab.comment_widget.get_settings()
