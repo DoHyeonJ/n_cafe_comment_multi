@@ -1,7 +1,6 @@
 import subprocess
 import time
 import re
-import socket
 
 def toggle_usb_tethering(enable):
     # USB 테더링을 켜거나 끄는 명령어

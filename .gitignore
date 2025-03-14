@@ -15,4 +15,4 @@ imgs
 account
 logs
 settings
-*.txt
+/tasks

@@ -236,4 +236,57 @@ class OpenAIGenerator:
                 retry_count += 1
                 if retry_count >= max_retries:
                     raise Exception(f"OpenAI API 호출 실패: {str(e)}")
+                time.sleep(2)  # 재시도 전 대기
+
+    def generate_simple_comment(self, prompt, style_prompt, model="gpt-4o-mini", max_retries=3, temperature=0.7):
+        """성향 및 말투가 적용된 일반 댓글 내용을 생성합니다.
+        
+        Args:
+            prompt (str): 댓글 생성을 위한 프롬프트 (게시글 내용 등)
+            style_prompt (str): 성향 및 말투를 지정하는 프롬프트
+            model (str): 사용할 OpenAI 모델
+            max_retries (int): 최대 재시도 횟수
+            temperature (float): 생성 다양성 조절 (0.0 ~ 1.0)
+            
+        Returns:
+            str: 생성된 댓글 내용
+        """
+        # 시스템 메시지 설정
+        system_message = f"""
+        당신은 네이버 카페의 댓글을 작성하는 AI입니다.
+        제공되는 게시글의 내용을 이해하고 이에 대한 의견이나 감상을 댓글로 작성해주세요.
+        
+        다음 성향과 말투로 댓글을 작성해주세요:
+        {style_prompt}
+        
+        다음 사항을 반드시 지켜주세요:
+        1. 게시글의 내용에 초점을 맞추어 댓글을 작성합니다.
+        2. 게시글에서 언급된 주제나 내용에 대한 자신의 생각이나 경험을 공유합니다.
+        3. 게시글 작성자의 의견이나 상황에 공감하는 내용을 포함합니다.
+        4. 위에서 지정된 성향과 말투에 맞게 일관성 있게 작성합니다.
+        5. JSON이나 다른 형식이 아닌, 순수한 댓글 텍스트만 반환합니다.
+        6. 자연스러운 댓글을 작성하되, 너무 길지 않게 작성합니다.
+        """
+        
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                response = self.client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_message},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=temperature
+                )
+                
+                # 댓글 내용만 반환
+                comment = response.choices[0].message.content.strip()
+                
+                return comment
+                
+            except Exception as e:
+                retry_count += 1
+                if retry_count >= max_retries:
+                    raise Exception(f"OpenAI API 호출 실패: {str(e)}")
                 time.sleep(2)  # 재시도 전 대기 
