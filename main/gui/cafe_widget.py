@@ -230,13 +230,13 @@ class CafeWidget(QWidget):
             }
         """)
         
-        self.verify_ip_btn = QPushButton("IP 검증")
+        self.verify_ip_btn = QPushButton("테더링 검증")
         self.verify_ip_btn.setStyleSheet("""
             QPushButton {
                 background-color: #5c85d6;
                 color: white;
                 border: none;
-                padding: 5px 10px;
+                padding: 10px 10px;
                 border-radius: 4px;
                 min-width: 80px;
             }

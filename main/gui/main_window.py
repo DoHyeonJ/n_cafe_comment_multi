@@ -2,7 +2,8 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QGridLayout,
                            QVBoxLayout, QGroupBox, QHBoxLayout, 
                            QLabel, QPushButton, QMessageBox,
                            QListWidgetItem, QApplication, QProgressDialog,
-                           QInputDialog)
+                           QInputDialog, QListWidget, QTabWidget, QDialog,
+                           QProgressBar, QFileDialog, QFormLayout, QScrollArea)
 from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QIcon, QFontMetrics, QDesktopServices
 from .script_tab import ScriptTab
@@ -20,9 +21,370 @@ import time
 import os
 from PyQt5.QtCore import QUrl
 import sys
+
+class TaskDetailDialog(QDialog):
+    def __init__(self, task, parent=None):
+        super().__init__(parent)
+        self.task = task
+        self.init_ui()
+        
+    def init_ui(self):
+        # 대화상자 설정
+        self.setWindowTitle(f"작업 #{self.task['id']} 상세 정보")
+        self.setMinimumSize(700, 450)  # 높이 줄임
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #2d2d2d;
+                color: white;
+            }
+            QLabel {
+                color: white;
+            }
+            QGroupBox {
+                color: white;
+                font-weight: bold;
+                border: 1px solid #555;
+                border-radius: 5px;
+                margin-top: 10px;
+                padding-top: 15px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 5px;
+            }
+        """)
+        
+        # 메인 레이아웃
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
+        
+        # 기본 정보 그룹
+        basic_group = QGroupBox("기본 정보")
+        basic_layout = QFormLayout()
+        basic_layout.setContentsMargins(15, 20, 15, 15)
+        basic_layout.setSpacing(10)
+        
+        # 계정 정보
+        account_count = len(self.task.get('all_accounts', []))
+        self.account_label = QLabel(f"{account_count}개 계정")
+        
+        # 계정 목록 대화상자 버튼
+        self.show_accounts_btn = QPushButton("계정 목록 보기")
+        self.show_accounts_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #5c85d6;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #4a6fb8;
+            }
+        """)
+        self.show_accounts_btn.clicked.connect(self.show_accounts_dialog)
+        
+        # 계정 컨테이너
+        account_container = QWidget()
+        account_layout = QHBoxLayout()  # 가로 배치로 변경
+        account_layout.setContentsMargins(0, 0, 0, 0)
+        account_layout.setSpacing(10)
+        account_layout.addWidget(self.account_label)
+        account_layout.addWidget(self.show_accounts_btn)
+        account_container.setLayout(account_layout)
+        
+        # 카페 및 게시판 정보
+        cafe_info = self.task['cafe_info']
+        board_info = self.task['board_info']
+        cafe_label = QLabel(f"{cafe_info['cafe_name']}")
+        board_label = QLabel(f"{board_info['board_name']}")
+        
+        # 기본 정보 추가
+        basic_layout.addRow("계정:", account_container)
+        basic_layout.addRow("카페:", cafe_label)
+        basic_layout.addRow("게시판:", board_label)
+        basic_group.setLayout(basic_layout)
+        
+        # 작업 설정 그룹
+        task_group = QGroupBox("작업 설정")
+        task_layout = QFormLayout()
+        task_layout.setContentsMargins(15, 20, 15, 15)
+        task_layout.setSpacing(10)
+        
+        # 작업 설정 정보
+        cafe_settings = self.task['cafe_settings']
+        post_count = cafe_settings.get('post_count', 0)
+        comment_min = cafe_settings.get('comment_count', {}).get('min', 0)
+        comment_max = cafe_settings.get('comment_count', {}).get('max', 0)
+        like_min = cafe_settings.get('like_count', {}).get('min', 0)
+        like_max = cafe_settings.get('like_count', {}).get('max', 0)
+        use_tethering = '사용' if cafe_settings.get('use_ip_tethering', False) else '미사용'
+        
+        # 작업 설정 추가
+        task_layout.addRow("게시글 수집:", QLabel(f"{post_count}개"))
+        task_layout.addRow("댓글 작업:", QLabel(f"{comment_min}~{comment_max}개 (랜덤)"))
+        task_layout.addRow("좋아요 작업:", QLabel(f"{like_min}~{like_max}개 (랜덤)"))
+        task_layout.addRow("IP 테더링:", QLabel(use_tethering))
+        task_group.setLayout(task_layout)
+        
+        # 댓글 설정 그룹
+        comment_group = QGroupBox("댓글 설정")
+        comment_layout = QFormLayout()
+        comment_layout.setContentsMargins(15, 20, 15, 15)
+        comment_layout.setSpacing(10)
+        
+        # 댓글 설정 정보
+        comment_settings = self.task['comment_settings']
+        interval = comment_settings.get('interval', {})
+        interval_min = interval.get('min', 0)
+        interval_max = interval.get('max', 0)
+        use_keywords = '사용' if comment_settings.get('use_keywords', False) else '미사용'
+        prevent_duplicate = '사용' if comment_settings.get('prevent_duplicate', True) else '미사용'
+        
+        # 프롬프트 목록
+        prompts = comment_settings.get('prompts', [])
+        prompt_count = len(prompts)
+        
+        # 프롬프트 대화상자 버튼
+        self.show_prompts_btn = QPushButton("AI 프롬프트 보기")
+        self.show_prompts_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #5c85d6;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #4a6fb8;
+            }
+        """)
+        self.show_prompts_btn.clicked.connect(self.show_prompts_dialog)
+        
+        # 프롬프트 컨테이너
+        prompt_container = QWidget()
+        prompt_layout = QHBoxLayout()  # 가로 배치로 변경
+        prompt_layout.setContentsMargins(0, 0, 0, 0)
+        prompt_layout.setSpacing(10)
+        prompt_layout.addWidget(QLabel(f"{prompt_count}개 등록됨"))
+        prompt_layout.addWidget(self.show_prompts_btn)
+        prompt_container.setLayout(prompt_layout)
+        
+        # 댓글 설정 추가
+        comment_layout.addRow("댓글 간격:", QLabel(f"{interval_min}~{interval_max}초 (랜덤)"))
+        comment_layout.addRow("키워드 사용:", QLabel(use_keywords))
+        comment_layout.addRow("중복 방지:", QLabel(prevent_duplicate))
+        comment_layout.addRow("AI 프롬프트:", prompt_container)
+        comment_group.setLayout(comment_layout)
+        
+        # 확인 버튼
+        close_btn = QPushButton("확인")
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #5c85d6;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                min-width: 100px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #4a6fb8;
+            }
+        """)
+        close_btn.clicked.connect(self.accept)
+        
+        # 레이아웃에 위젯 추가
+        main_layout.addWidget(basic_group)
+        main_layout.addWidget(task_group)
+        main_layout.addWidget(comment_group)
+        main_layout.addWidget(close_btn, alignment=Qt.AlignCenter)
+        
+        self.setLayout(main_layout)
+    
+    def show_accounts_dialog(self):
+        """계정 목록을 별도의 대화상자로 표시"""
+        accounts = self.task.get('all_accounts', [])
+        if not accounts:
+            QMessageBox.information(self, "계정 목록", "등록된 계정이 없습니다.")
+            return
+            
+        # 계정 목록 대화상자 생성
+        dialog = QDialog(self)
+        dialog.setWindowTitle("계정 목록")
+        dialog.setMinimumSize(300, 400)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #2d2d2d;
+                color: white;
+            }
+            QLabel {
+                color: white;
+            }
+            QListWidget {
+                background-color: #333;
+                color: white;
+                border: 1px solid #555;
+                border-radius: 3px;
+            }
+            QListWidget::item {
+                padding: 5px;
+                border-bottom: 1px solid #444;
+            }
+            QListWidget::item:selected {
+                background-color: #4a6fb8;
+            }
+            QPushButton {
+                background-color: #5c85d6;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #4a6fb8;
+            }
+        """)
+        
+        # 레이아웃 설정
+        layout = QVBoxLayout()
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
+        
+        # 계정 수 표시
+        count_label = QLabel(f"총 {len(accounts)}개 계정")
+        count_label.setStyleSheet("font-weight: bold; margin-bottom: 5px;")
+        layout.addWidget(count_label)
+        
+        # 계정 목록 위젯
+        account_list = QListWidget()
+        for account in accounts:
+            account_list.addItem(account)
+        layout.addWidget(account_list)
+        
+        # 닫기 버튼
+        close_btn = QPushButton("닫기")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn, alignment=Qt.AlignCenter)
+        
+        dialog.setLayout(layout)
+        dialog.exec_()
+    
+    def show_prompts_dialog(self):
+        """프롬프트 목록을 별도의 대화상자로 표시"""
+        prompts = self.task['comment_settings'].get('prompts', [])
+        if not prompts:
+            QMessageBox.information(self, "AI 프롬프트", "등록된 프롬프트가 없습니다.")
+            return
+            
+        # 프롬프트 목록 대화상자 생성
+        dialog = QDialog(self)
+        dialog.setWindowTitle("AI 프롬프트 목록")
+        dialog.setMinimumSize(500, 400)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #2d2d2d;
+                color: white;
+            }
+            QLabel {
+                color: white;
+            }
+            QScrollArea {
+                border: 1px solid #555;
+                background-color: #333;
+            }
+            QPushButton {
+                background-color: #5c85d6;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #4a6fb8;
+            }
+        """)
+        
+        # 레이아웃 설정
+        layout = QVBoxLayout()
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
+        
+        # 프롬프트 수 표시
+        count_label = QLabel(f"총 {len(prompts)}개 프롬프트")
+        count_label.setStyleSheet("font-weight: bold; margin-bottom: 5px;")
+        layout.addWidget(count_label)
+        
+        # 스크롤 영역
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        
+        # 프롬프트 컨테이너
+        container = QWidget()
+        container_layout = QVBoxLayout()
+        container_layout.setContentsMargins(10, 10, 10, 10)
+        container_layout.setSpacing(10)
+        
+        # 프롬프트 목록 추가
+        for i, prompt in enumerate(prompts, 1):
+            prompt_frame = QWidget()
+            prompt_frame.setStyleSheet("background-color: #3a3a3a; border-radius: 4px;")
+            
+            prompt_layout = QVBoxLayout()
+            prompt_layout.setContentsMargins(10, 10, 10, 10)
+            
+            # 프롬프트 번호
+            number_label = QLabel(f"프롬프트 #{i}")
+            number_label.setStyleSheet("color: #aaa; font-size: 12px;")
+            
+            # 프롬프트 내용
+            content_label = QLabel(prompt)
+            content_label.setWordWrap(True)
+            content_label.setStyleSheet("color: #ddd; padding: 5px 0;")
+            
+            prompt_layout.addWidget(number_label)
+            prompt_layout.addWidget(content_label)
+            prompt_frame.setLayout(prompt_layout)
+            
+            container_layout.addWidget(prompt_frame)
+        
+        container_layout.addStretch()
+        container.setLayout(container_layout)
+        scroll.setWidget(container)
+        
+        layout.addWidget(scroll)
+        
+        # 닫기 버튼
+        close_btn = QPushButton("닫기")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn, alignment=Qt.AlignCenter)
+        
+        dialog.setLayout(layout)
+        dialog.exec_()
+
 class TaskListItem(QWidget):
     def __init__(self, task_name, task_info, task_number, parent=None):
         super().__init__(parent)
+        self.task_info = task_info  # 작업 정보 저장
+        self.task_number = task_number  # 작업 번호 저장
+        
+        # 클릭 가능한 스타일 설정
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #2d2d2d;
+                border-radius: 4px;
+            }
+            QWidget:hover {
+                background-color: #3a3a3a;
+                cursor: pointer;
+            }
+        """)
+        
         layout = QHBoxLayout()
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(12)
@@ -63,110 +425,35 @@ class TaskListItem(QWidget):
         # 계정 및 카페 정보
         account_cafe_layout = QHBoxLayout()
         account_cafe_layout.setContentsMargins(0, 0, 0, 0)
-        account_cafe_layout.setSpacing(10)
+        account_cafe_layout.setSpacing(15)  # 간격 증가
         
-        # 계정 정보
-        self.account_label = QLabel(f"계정: {task_info['account_id']}")
+        # 계정 정보 - 개수만 표시
+        account_count = task_info.get('account_count', 1)
+        self.account_label = QLabel(f"계정: {account_count}개")
         self.account_label.setStyleSheet("""
             color: white;
             font-size: 13px;
             font-weight: bold;
         """)
         
-        # 카페 정보
-        self.cafe_label = QLabel(f"카페: {task_info['cafe_name']}")
-        self.cafe_label.setStyleSheet("""
+        # 카페/게시판 정보 통합 - 각각 5글자로 제한
+        cafe_name = self.limit_text(task_info['cafe_name'], 10)
+        board_name = self.limit_text(task_info['board_name'], 10)
+        cafe_board_text = f"카페/게시판: {cafe_name}/{board_name}"
+        
+        self.cafe_board_label = QLabel(cafe_board_text)
+        self.cafe_board_label.setStyleSheet("""
             color: white;
             font-size: 13px;
         """)
-        
-        # 게시판 정보
-        self.board_label = QLabel(f"게시판: {task_info['board_name']}")
-        self.board_label.setStyleSheet("""
-            color: white;
-            font-size: 13px;
-        """)
-        
-        # 정보 버튼
-        self.info_btn = QPushButton("정보")
-        self.info_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #5c85d6;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 3px;
-                min-width: 60px;
-            }
-            QPushButton:hover {
-                background-color: #4a6fb8;
-            }
-        """)
+        self.cafe_board_label.setToolTip(f"{task_info['cafe_name']}/{task_info['board_name']}")  # 전체 텍스트를 툴팁으로 표시
         
         account_cafe_layout.addWidget(self.account_label)
-        account_cafe_layout.addWidget(self.cafe_label)
-        account_cafe_layout.addWidget(self.board_label)
-        account_cafe_layout.addWidget(self.info_btn)
+        account_cafe_layout.addWidget(self.cafe_board_label)
         account_cafe_layout.addStretch()
-        
-        # 작업 설정 정보
-        settings_layout = QHBoxLayout()
-        settings_layout.setContentsMargins(0, 0, 0, 0)
-        settings_layout.setSpacing(10)
-        
-        # 게시글 수집 정보
-        self.post_label = QLabel(f"게시글: {task_info['post_count']}개")
-        self.post_label.setStyleSheet("""
-            color: #cccccc;
-            font-size: 12px;
-        """)
-        
-        # 댓글 작업 정보
-        comment_min = task_info['comment_min']
-        comment_max = task_info['comment_max']
-        self.comment_label = QLabel(f"댓글: {comment_min}~{comment_max}개")
-        self.comment_label.setStyleSheet("""
-            color: #cccccc;
-            font-size: 12px;
-        """)
-        
-        # 좋아요 작업 정보
-        like_min = task_info['like_min']
-        like_max = task_info['like_max']
-        self.like_label = QLabel(f"좋아요: {like_min}~{like_max}개")
-        self.like_label.setStyleSheet("""
-            color: #cccccc;
-            font-size: 12px;
-        """)
-        
-        # 댓글 간격 정보
-        interval_min = task_info['interval_min']
-        interval_max = task_info['interval_max']
-        self.interval_label = QLabel(f"간격: {interval_min}~{interval_max}초")
-        self.interval_label.setStyleSheet("""
-            color: #cccccc;
-            font-size: 12px;
-        """)
-        
-        settings_layout.addWidget(self.post_label)
-        settings_layout.addWidget(self.comment_label)
-        settings_layout.addWidget(self.like_label)
-        settings_layout.addWidget(self.interval_label)
-        settings_layout.addStretch()
-        
-        # 게시글 URL 레이블 (기본적으로 숨김)
-        self.post_url_label = QLabel()
-        self.post_url_label.setStyleSheet("""
-            color: #5c85d6;
-            font-size: 12px;
-        """)
-        self.post_url_label.setTextFormat(Qt.RichText)
-        self.post_url_label.setOpenExternalLinks(True)
-        self.post_url_label.setVisible(False)
         
         # 정보 레이아웃에 추가
         info_layout.addLayout(account_cafe_layout)
-        info_layout.addLayout(settings_layout)
         info_container.setLayout(info_layout)
         
         # 레이아웃에 위젯 추가
@@ -176,6 +463,12 @@ class TaskListItem(QWidget):
         
         # 상태에 따른 스타일 설정
         self.update_status_style(task_info['status'])
+    
+    def limit_text(self, text, max_length):
+        """텍스트 길이 제한 함수"""
+        if len(text) > max_length:
+            return text[:max_length] + "..."
+        return text
     
     def update_status_style(self, status):
         """상태에 따른 스타일 업데이트"""
@@ -192,18 +485,12 @@ class TaskListItem(QWidget):
     
     def set_post_url(self, url, title=None):
         """게시글 URL 설정"""
-        if title:
-            self.post_url_label.setText(f"<a href='{url}' style='color: #5c85d6; text-decoration: none;'>{title}</a>")
-        else:
-            self.post_url_label.setText(f"<a href='{url}' style='color: #5c85d6; text-decoration: none;'>{url}</a>")
-        self.post_url_label.setVisible(True)
-        
-        # 상태 업데이트
+        # 상태 업데이트만 수행
         self.update_status_style('완료')
-    
+        
     def sizeHint(self):
         """위젯 크기 힌트"""
-        return QSize(600, 70)
+        return QSize(0, 45)  # 너비를 0으로 설정하여 부모 위젯에 맞추도록 함
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -225,6 +512,9 @@ class MainWindow(QMainWindow):
         # 작업 실행 상태
         self.is_running = False
         self.workers = []  # 워커 목록
+        
+        # 시그널 연결 상태 추적
+        self.task_list_click_connected = False
         
         # 모니터링 위젯 생성
         self.monitor_widget = RoutineTab(self.log)
@@ -417,23 +707,6 @@ class MainWindow(QMainWindow):
                 background-color: #3d3d3d;
             }
         """)
-        
-        # 파일 메뉴
-        file_menu = menubar.addMenu('파일')
-        
-        # 설정 저장 액션
-        save_action = file_menu.addAction('설정 저장')
-        save_action.triggered.connect(self.show_settings_dialog)
-        
-        # 설정 불러오기 액션
-        load_action = file_menu.addAction('설정 관리')
-        load_action.triggered.connect(self.show_settings_dialog)
-        
-        file_menu.addSeparator()
-        
-        # 종료 액션
-        exit_action = file_menu.addAction('종료')
-        exit_action.triggered.connect(self.close)
 
     def show_settings_dialog(self):
         """설정 관리 대화상자 표시"""
@@ -762,10 +1035,16 @@ class MainWindow(QMainWindow):
         interval_min = interval.get('min', 0)
         interval_max = interval.get('max', 0)
         
-        # 댓글 프롬프트 (너무 길면 잘라서 표시)
-        prompt = comment_settings.get('prompt', '')
-        if len(prompt) > 100:
-            prompt = prompt[:100] + "..."
+        # 프롬프트 목록 정보
+        prompts = comment_settings.get('prompts', [])
+        prompt_count = len(prompts)
+        
+        # 프롬프트 예시 (첫 번째 프롬프트만 표시, 너무 길면 잘라서 표시)
+        prompt_example = ""
+        if prompt_count > 0:
+            prompt_example = prompts[0]
+            if len(prompt_example) > 100:
+                prompt_example = prompt_example[:100] + "..."
         
         message = f"""
 [기본 정보]
@@ -782,8 +1061,13 @@ class MainWindow(QMainWindow):
 [댓글 설정]
 - 댓글 간격: {interval_min}~{interval_max}초 (랜덤)
 - 키워드 사용: {'사용' if comment_settings.get('use_keywords', False) else '미사용'}
-- AI 프롬프트: {prompt}
+- 중복 방지: {'사용' if comment_settings.get('prevent_duplicate', True) else '미사용'}
+- AI 프롬프트: {prompt_count}개 등록됨
 """
+        
+        # 프롬프트 예시 추가 (있는 경우에만)
+        if prompt_example:
+            message += f"\n[프롬프트 예시]\n{prompt_example}"
         
         # 메시지 박스 표시
         QMessageBox.information(self, f"작업 {task_id} 설정", message)
@@ -852,35 +1136,18 @@ class MainWindow(QMainWindow):
         
         # 작업 목록 업데이트
         for task in self.tasks:
-            # 계정 정보 형식 설정
+            # 계정 개수 계산
             account_count = len(task.get('all_accounts', []))
-            account_display = f"{account_count}개 계정"
-            
-            # 카페 및 게시판 이름 길이 제한 (15자 이상이면 줄임표 표시)
-            cafe_name = task['cafe_info']['cafe_name']
-            if len(cafe_name) > 15:
-                cafe_name = cafe_name[:15] + "..."
-                
-            board_name = task['board_info']['board_name']
-            if len(board_name) > 15:
-                board_name = board_name[:15] + "..."
             
             # 작업 정보 생성
             task_info = {
-                'account_id': account_display,
-                'cafe_name': cafe_name,
-                'board_name': board_name,
+                'account_count': account_count,  # 계정 개수 추가
+                'cafe_name': task['cafe_info']['cafe_name'],
+                'board_name': task['board_info']['board_name'],
                 'status': task.get('status', '대기 중'),
                 'progress': task.get('progress', 0),
                 'completed_count': task.get('completed_count', 0),
-                'error_count': task.get('error_count', 0),
-                'post_count': task['cafe_settings'].get('post_count', 0),
-                'comment_min': task['cafe_settings'].get('comment_count', {}).get('min', 0),
-                'comment_max': task['cafe_settings'].get('comment_count', {}).get('max', 0),
-                'like_min': task['cafe_settings'].get('like_count', {}).get('min', 0),
-                'like_max': task['cafe_settings'].get('like_count', {}).get('max', 0),
-                'interval_min': task['comment_settings'].get('interval', {}).get('min', 0),
-                'interval_max': task['comment_settings'].get('interval', {}).get('max', 0)
+                'error_count': task.get('error_count', 0)
             }
             
             # 작업 항목 생성
@@ -892,14 +1159,33 @@ class MainWindow(QMainWindow):
             # 작업 항목 추가
             self.monitor_widget.task_list.addItem(item)
             self.monitor_widget.task_list.setItemWidget(item, task_widget)
-            
-            # 정보 버튼에 클릭 이벤트 연결
-            task_widget.info_btn.clicked.connect(
-                lambda checked=False, t_id=task['id']: self.view_task_settings(t_id)
-            )
         
         # 작업 개수 업데이트
         self.monitor_widget.task_count_label.setText(f"총 {len(self.tasks)}개의 작업")
+        
+        # 작업 항목 클릭 시 상세 정보 표시 이벤트 연결 (한 번만 연결)
+        if not self.task_list_click_connected:
+            self.monitor_widget.task_list.itemClicked.connect(self.show_task_detail)
+            self.task_list_click_connected = True
+
+    def show_task_detail(self, item):
+        """작업 항목 클릭 시 상세 정보 표시"""
+        # 작업 ID 가져오기
+        task_id = item.data(Qt.UserRole)
+        
+        # 작업 찾기
+        task = None
+        for t in self.tasks:
+            if t['id'] == task_id:
+                task = t
+                break
+                
+        if not task:
+            return
+            
+        # 상세 정보 대화상자 표시
+        detail_dialog = TaskDetailDialog(task, self)
+        detail_dialog.exec_()
 
     def on_tasks_reordered(self, parent, start, end, destination, row):
         """작업 순서 변경 처리"""
@@ -1374,15 +1660,15 @@ class MainWindow(QMainWindow):
         # 카페 설정 가져오기
         cafe_settings = self.settings_tab.cafe_widget.get_settings()
         
-        # 댓글 설정 가져오기
-        comment_settings = self.settings_tab.comment_widget.get_settings()
+        # 댓글 설정 가져오기 (프롬프트 목록과 중복방지 설정 포함)
+        full_comment_settings = self.settings_tab.comment_widget.get_settings()
         
         # 댓글 프롬프트 확인
-        if not comment_settings.get('prompt', '').strip():
+        if not full_comment_settings.get('prompts') or len(full_comment_settings.get('prompts', [])) == 0:
             reply = QMessageBox.question(
                 self,
                 'AI 프롬프트 확인',
-                'AI 프롬프트가 비어있습니다. 계속 진행하시겠습니까?',
+                'AI 프롬프트가 등록되지 않았습니다. 계속 진행하시겠습니까?',
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
             )
@@ -1403,7 +1689,7 @@ class MainWindow(QMainWindow):
             'cafe_info': selected_cafe,
             'board_info': selected_board,
             'cafe_settings': cafe_settings,
-            'comment_settings': comment_settings,
+            'comment_settings': full_comment_settings,  # 전체 댓글 설정 사용
             'status': '대기 중',
             'progress': 0,
             'completed_count': 0,

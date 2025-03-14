@@ -219,7 +219,7 @@ class RoutineTab(BaseMonitorWidget):
         interval_layout.setContentsMargins(0, 0, 0, 0)
         interval_layout.setSpacing(8)
         
-        min_interval_label = QLabel("최소 간격(분):")
+        min_interval_label = QLabel("최소 (분):")
         min_interval_label.setStyleSheet("color: white;")
         self.min_interval = QSpinBox()
         self.min_interval.setRange(1, 1440)
@@ -234,7 +234,7 @@ class RoutineTab(BaseMonitorWidget):
             }
         """)
         
-        max_interval_label = QLabel("최대 간격(분):")
+        max_interval_label = QLabel("최대 (분):")
         max_interval_label.setStyleSheet("color: white;")
         self.max_interval = QSpinBox()
         self.max_interval.setRange(1, 1440)
@@ -669,4 +669,25 @@ class RoutineTab(BaseMonitorWidget):
                 f"다음 작업 #{next_task_number} - {next_execution_time} (대기: {wait_time})"
             )
         else:
-            self.next_task_label.setText("대기 중...") 
+            self.next_task_label.setText("대기 중...")
+
+    def get_settings(self):
+        """현재 설정 정보 반환"""
+        return {
+            'min_interval': self.min_interval.value(),
+            'max_interval': self.max_interval.value(),
+            'repeat': self.repeat_checkbox.isChecked(),
+            'api_key': self.api_key_input.text().strip(),
+            'prevent_duplicate': self.prevent_duplicate_check.isChecked()
+        }
+
+    def load_settings(self, settings):
+        """설정값 로드"""
+        if not settings:
+            return
+            
+        self.min_interval.setValue(settings.get('min_interval', 5))
+        self.max_interval.setValue(settings.get('max_interval', 15))
+        self.repeat_checkbox.setChecked(settings.get('repeat', True))
+        self.api_key_input.setText(settings.get('api_key', ''))
+        self.prevent_duplicate_check.setChecked(settings.get('prevent_duplicate', True)) 
