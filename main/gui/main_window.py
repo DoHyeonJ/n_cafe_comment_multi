@@ -3,7 +3,8 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QGridLayout,
                            QLabel, QPushButton, QMessageBox,
                            QListWidgetItem, QApplication, QProgressDialog,
                            QInputDialog, QListWidget, QTabWidget, QDialog,
-                           QProgressBar, QFileDialog, QFormLayout, QScrollArea)
+                           QProgressBar, QFileDialog, QFormLayout, QScrollArea,
+                           QMenu, QAction)
 from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QIcon, QFontMetrics, QDesktopServices
 from .script_tab import ScriptTab
@@ -14,6 +15,7 @@ from .styles import DARK_STYLE
 from .account_widget import AccountWidget
 from ..api.cafe import CafeAPI
 from .settings_dialog import SettingsDialog
+from .task_settings_dialog import TaskSettingsDialog
 from ..utils.settings_manager import SettingsManager
 from ..api.auth import NaverAuth
 from ..worker import Worker
@@ -705,6 +707,63 @@ class MainWindow(QMainWindow):
                 background-color: #3d3d3d;
             }
         """)
+        
+        # 파일 메뉴
+        file_menu = menubar.addMenu('파일')
+        
+        # 작업 설정 관리 메뉴
+        task_settings_action = QAction('작업 설정 관리', self)
+        task_settings_action.triggered.connect(self.show_task_settings_dialog)
+        file_menu.addAction(task_settings_action)
+        
+        # 구분선
+        file_menu.addSeparator()
+        
+        # 종료 메뉴
+        exit_action = QAction('종료', self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # 도움말 메뉴
+        help_menu = menubar.addMenu('도움말')
+        
+        # 라이선스 정보 메뉴
+        license_action = QAction('라이선스 정보', self)
+        license_action.triggered.connect(self.show_license_info)
+        help_menu.addAction(license_action)
+        
+        # 프로그램 정보 메뉴
+        about_action = QAction('프로그램 정보', self)
+        about_action.triggered.connect(self.show_about_info)
+        help_menu.addAction(about_action)
+
+    def show_task_settings_dialog(self):
+        """작업 설정 관리 대화상자 표시"""
+        dialog = TaskSettingsDialog(self)
+        dialog.exec_()
+        
+    def show_license_info(self):
+        """라이선스 정보 표시"""
+        license_key = self.licence.get_licence_key()
+        expiry_date = self.licence.get_expiry_date()
+        
+        message = f"""
+라이선스 정보:
+- 라이선스 키: {license_key}
+- 만료일: {expiry_date}
+        """
+        
+        QMessageBox.information(self, "라이선스 정보", message)
+        
+    def show_about_info(self):
+        """프로그램 정보 표시"""
+        message = """
+네이버 카페 댓글 프로그램 v1.0
+
+© 2023 All Rights Reserved.
+        """
+        
+        QMessageBox.information(self, "프로그램 정보", message)
 
     def show_settings_dialog(self):
         """설정 관리 대화상자 표시"""
