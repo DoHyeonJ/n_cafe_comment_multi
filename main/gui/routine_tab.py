@@ -779,13 +779,33 @@ class RoutineTab(BaseMonitorWidget):
                 )
                 
                 if reply == QMessageBox.Yes:
-                    # 테더링 활성화
-                    toggle_usb_tethering(True)
-                    self.log.info("USB 테더링이 활성화되었습니다.")
+                    # 테더링 활성화 시도
+                    tethering_enabled = toggle_usb_tethering(True)
+                    
+                    # 테더링 상태 확인 및 사용자에게 알림
+                    if tethering_enabled:
+                        QMessageBox.information(
+                            self,
+                            "테더링 활성화 성공",
+                            "USB 테더링이 성공적으로 활성화되었습니다."
+                        )
+                        # IP 정보 업데이트
+                        self.update_current_ip()
+                    else:
+                        QMessageBox.warning(
+                            self,
+                            "테더링 활성화 실패",
+                            "USB 테더링 활성화에 실패했습니다.\n"
+                            "기기 연결 상태와 권한을 확인해주세요."
+                        )
+                        # 체크박스 상태 되돌리기
+                        self.ip_tethering_checkbox.setChecked(False)
         else:
-            # IP 상태 초기화
-            self.ip_status.setText("")
-            
+            # 테더링 비활성화 시도
+            if is_tethering_enabled():
+                toggle_usb_tethering(False)
+                self.log.info("USB 테더링이 비활성화되었습니다.")
+        
         # 로그 메시지 추가
         self.log.info(f"IP 테더링 사용: {'활성화' if checked else '비활성화'}")
     
@@ -808,6 +828,28 @@ class RoutineTab(BaseMonitorWidget):
         self.ip_status.setStyleSheet("color: #5c85d6;")
         
         try:
+            # 테더링 상태 확인
+            if not is_tethering_enabled():
+                self.log.info("테더링이 활성화되어 있지 않습니다. 활성화를 시도합니다.")
+                
+                # 테더링 활성화 시도
+                tethering_enabled = toggle_usb_tethering(True)
+                
+                if not tethering_enabled:
+                    self.ip_status.setText("✗ 테더링 실패")
+                    self.ip_status.setStyleSheet("color: #d65c5c;")
+                    self.log.error("USB 테더링 활성화에 실패했습니다.")
+                    QMessageBox.warning(
+                        self, 
+                        "테더링 활성화 실패", 
+                        "USB 테더링 활성화에 실패했습니다.\n"
+                        "기기 연결 상태와 권한을 확인해주세요."
+                    )
+                    self.validate_ip_btn.setEnabled(True)
+                    return
+                
+                self.log.info("USB 테더링이 활성화되었습니다.")
+            
             # IP 변경 시도
             is_changed, old_ip, new_ip = change_ip()
             

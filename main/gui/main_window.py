@@ -795,15 +795,22 @@ class MainWindow(QMainWindow):
         accounts_to_login = []
         
         if 'accounts' in settings_data:
+            # 첫 번째 계정만 로그인 검증
+            first_account = None
+            
             for account_id, account_info in settings_data['accounts'].items():
-                # 계정이 이미 있는지 확인
-                if account_id in self.accounts:
-                    # 헤더 정보가 유효한지 확인
-                    if not self.is_header_valid(self.accounts[account_id].get('headers', {})):
+                # 첫 번째 계정 저장
+                if first_account is None:
+                    first_account = (account_id, account_info['pw'])
+                    
+                    # 첫 번째 계정이 이미 있는지 확인
+                    if account_id in self.accounts:
+                        # 헤더 정보가 유효한지 확인
+                        if not self.is_header_valid(self.accounts[account_id].get('headers', {})):
+                            accounts_to_login.append((account_id, account_info['pw']))
+                    else:
+                        # 새 계정은 로그인 필요
                         accounts_to_login.append((account_id, account_info['pw']))
-                else:
-                    # 새 계정은 로그인 필요
-                    accounts_to_login.append((account_id, account_info['pw']))
         
         # 로그인이 필요한 계정이 있으면 사용자에게 알림
         if accounts_to_login:
@@ -811,7 +818,7 @@ class MainWindow(QMainWindow):
             reply = QMessageBox.question(
                 self,
                 '계정 로그인 필요',
-                f'다음 계정들은 로그인이 필요합니다:\n\n{accounts_str}\n\n'
+                f'첫 번째 계정의 로그인이 필요합니다:\n\n{accounts_str}\n\n'
                 f'로그인을 진행하시겠습니까? (설정 불러오기를 완료하려면 필요합니다)',
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.Yes
@@ -824,6 +831,11 @@ class MainWindow(QMainWindow):
         old_accounts = self.accounts.copy()
         self.accounts = {}
         self.tasks = []
+        
+        # 계정 위젯의 계정 목록 초기화
+        self.account_widget.account_list.clear()
+        self.account_widget.verified_accounts.clear()
+        self.account_widget.account_passwords.clear()
         
         # 계정 정보 복원
         if 'accounts' in settings_data:
@@ -842,20 +854,21 @@ class MainWindow(QMainWindow):
                 }
                 
                 # UI에 계정 추가
-                if not self.account_widget.account_list.findItems(account_id, Qt.MatchExactly):
-                    self.account_widget.account_list.addItem(account_id)
+                self.account_widget.account_list.addItem(account_id)
+                # 계정 비밀번호도 AccountWidget에 저장
+                self.account_widget.account_passwords[account_id] = account_info['pw']
                 
         # 작업 목록 복원
         if 'tasks' in settings_data:
             self.tasks = settings_data['tasks']
         self.update_task_list()
         
-        # 로그인 필요한 계정들에 대해 로그인 진행
+        # 로그인 필요한 계정들에 대해 로그인 진행 (첫 번째 계정만)
         if accounts_to_login:
-            self.log.info(f"{len(accounts_to_login)}개 계정에 대해 로그인을 진행합니다...")
+            self.log.info(f"첫 번째 계정에 대해 로그인을 진행합니다...")
             
             # 로그인 진행 상태 대화상자
-            progress_dialog = QProgressDialog("계정 로그인 중입니다...", "취소", 0, len(accounts_to_login), self)
+            progress_dialog = QProgressDialog("계정 로그인 중입니다...", "취소", 0, 1, self)
             progress_dialog.setWindowTitle("로그인 진행 중")
             progress_dialog.setWindowModality(Qt.WindowModal)
             progress_dialog.setAutoClose(True)
@@ -866,32 +879,43 @@ class MainWindow(QMainWindow):
             
             login_success_count = 0
             
-            for i, (account_id, password) in enumerate(accounts_to_login):
-                # 진행 상태 업데이트
-                progress_dialog.setValue(i)
-                progress_dialog.setLabelText(f"계정 '{account_id}' 로그인 중... ({i+1}/{len(accounts_to_login)})")
-                QApplication.processEvents()  # UI 업데이트
+            # 첫 번째 계정만 로그인
+            account_id, password = accounts_to_login[0]
+            
+            # 진행 상태 업데이트
+            progress_dialog.setValue(0)
+            progress_dialog.setLabelText(f"계정 '{account_id}' 로그인 중...")
+            QApplication.processEvents()  # UI 업데이트
+            
+            # 로그인 시도
+            auth = NaverAuth()
+            auth.set_credentials(account_id, password)
+            success = auth.login()
+            
+            if success:
+                # 로그인 성공 시 헤더 정보 업데이트
+                headers = auth.get_headers()
+                self.accounts[account_id]['headers'] = headers
                 
-                # 로그인 시도
-                auth = NaverAuth()
-                auth.set_credentials(account_id, password)
-                success = auth.login()
+                # 카페 목록 로드
+                self.load_cafe_list(account_id, headers)
+                login_success_count += 1
                 
-                if success:
-                    # 로그인 성공 시 헤더 정보 업데이트
-                    headers = auth.get_headers()
-                    self.accounts[account_id]['headers'] = headers
-                    
-                    # 카페 목록 로드
-                    self.load_cafe_list(account_id, headers)
-                    login_success_count += 1
-                    
-                    self.log.info(f"계정 '{account_id}' 로그인 성공")
-                else:
-                    self.log.error(f"계정 '{account_id}' 로그인 실패")
+                # 검증된 계정 목록에 추가
+                self.account_widget.verified_accounts.add(account_id)
+                
+                # 계정 아이템 스타일 업데이트
+                items = self.account_widget.account_list.findItems(account_id, Qt.MatchExactly)
+                if items:
+                    items[0].setForeground(Qt.green)
+                    items[0].setText(f"{account_id} ✓")  # 체크 표시 추가
+                
+                self.log.info(f"계정 '{account_id}' 로그인 성공")
+            else:
+                self.log.error(f"계정 '{account_id}' 로그인 실패")
             
             # 진행 대화상자 완료 및 닫기
-            progress_dialog.setValue(len(accounts_to_login))
+            progress_dialog.setValue(1)
             progress_dialog.close()
             
             # 로그인 결과 알림
@@ -899,21 +923,20 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(
                     self,
                     '로그인 완료',
-                    f'{login_success_count}개 계정의 로그인이 완료되었습니다.'
+                    f'첫 번째 계정의 로그인이 완료되었습니다.'
                 )
-            
-            if login_success_count < len(accounts_to_login):
+            else:
                 QMessageBox.warning(
                     self,
-                    '일부 로그인 실패',
-                    f'{len(accounts_to_login) - login_success_count}개 계정의 로그인에 실패했습니다.\n'
+                    '로그인 실패',
+                    f'첫 번째 계정의 로그인에 실패했습니다.\n'
                     f'해당 계정은 수동으로 다시 로그인해주세요.'
                 )
         
         # 첫 번째 계정 선택
         if self.account_widget.account_list.count() > 0:
             self.account_widget.account_list.setCurrentRow(0)
-            first_account = self.account_widget.account_list.item(0).text()
+            first_account = self.account_widget.account_list.item(0).text().split(' ')[0]  # ✓ 마크 제거
             self.on_account_selected(first_account)  # 첫 번째 계정의 카페 목록 로드
         
         self.log.info("설정이 성공적으로 적용되었습니다.")

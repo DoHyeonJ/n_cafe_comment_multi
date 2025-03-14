@@ -7,6 +7,12 @@ def toggle_usb_tethering(enable):
     # USB 테더링을 켜거나 끄는 명령어
     command = "adb shell svc usb setFunctions rndis" if enable else "adb shell svc usb setFunctions none"
     subprocess.run(command, shell=True)
+    
+    # 테더링 상태 확인을 위해 잠시 대기
+    time.sleep(1)
+    
+    # 테더링 상태 확인
+    return is_tethering_enabled()
 
 def toggle_mobile_data(enable):
     # 모바일 데이터를 켜거나 끄는 명령어
@@ -25,19 +31,44 @@ def get_current_ip():
         return "알 수 없음"
 
 def is_tethering_enabled():
-    """테더링 활성화 상태를 확인하는 함수"""
+    """USB 테더링이 활성화되어 있는지 확인합니다.
+    
+    Returns:
+        bool: 테더링이 활성화되어 있으면 True, 아니면 False
+    """
     try:
-        # adb 명령어로 테더링 상태 확인
-        result = subprocess.check_output("adb shell settings get global tether_dun_required", shell=True)
-        result = result.decode('utf-8').strip()
-        # 0이면 활성화, 1이면 비활성화 (기기마다 다를 수 있음)
-        return result == "0"
+        # USB 함수 상태 확인
+        result = subprocess.run("adb shell getprop sys.usb.state", shell=True, capture_output=True, text=True)
+        output = result.stdout.strip()
+        
+        # 'rndis'가 포함되어 있으면 테더링이 활성화된 상태
+        if 'rndis' in output:
+            return True
+            
+        # 네트워크 인터페이스 확인 (추가 검증)
+        result = subprocess.run("adb shell ip addr show", shell=True, capture_output=True, text=True)
+        output = result.stdout.strip()
+        
+        # rndis 인터페이스가 있고 UP 상태인지 확인
+        if re.search(r'rndis.*state UP', output):
+            return True
+            
+        return False
     except Exception as e:
         print(f"테더링 상태 확인 중 오류 발생: {str(e)}")
         return False
 
 def change_ip():
     print("IP 변경을 시작합니다...")
+    
+    # 테더링 상태 확인
+    if not is_tethering_enabled():
+        print("테더링이 활성화되어 있지 않습니다. 활성화를 시도합니다.")
+        tethering_enabled = toggle_usb_tethering(True)
+        if not tethering_enabled:
+            print("테더링 활성화에 실패했습니다.")
+            return False, "Unknown", "Unknown"
+        print("테더링이 활성화되었습니다.")
     
     # 현재 IP 확인
     old_ip = get_current_ip()

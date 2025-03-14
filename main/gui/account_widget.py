@@ -583,10 +583,23 @@ class AccountWidget(QWidget):
             # 비밀번호 저장
             self.account_passwords[username] = password
             
-            # 계정 목록에 추가
-            items = self.account_list.findItems(username, Qt.MatchStartsWith)  # 체크 마크가 있을 수 있으므로 StartsWith 사용
+            # 계정 목록에 추가 또는 업데이트
+            # 정확한 계정 ID 검색을 위해 MatchExactly 사용
+            items = self.account_list.findItems(username, Qt.MatchExactly)
+            
+            # 체크 마크가 있는 경우를 위해 StartsWith로도 검색
+            if not items:
+                items = self.account_list.findItems(username + " ", Qt.MatchStartsWith)
+            
             if items:
+                # 기존 항목 업데이트
                 self.update_account_item_style(items[0])
+            else:
+                # 새 항목 추가 (이 부분은 일반적으로 실행되지 않아야 함)
+                self.log.warning(f"계정 '{username}'이 목록에 없어 새로 추가합니다.")
+                new_item = QListWidgetItem(username)
+                self.account_list.addItem(new_item)
+                self.update_account_item_style(new_item)
             
             # 계정 추가 시그널 발생
             self.account_added.emit(username, password)
@@ -595,24 +608,37 @@ class AccountWidget(QWidget):
             self.login_success.emit(headers)
             
             # 현재 선택된 계정이 로그인된 계정인 경우 선택 시그널 다시 발생
-            if self.account_list.currentItem() and self.account_list.currentItem().text().split(' ')[0] == username:
-                self.account_selected.emit(username)
+            if self.account_list.currentItem():
+                current_account = self.account_list.currentItem().text().split(' ')[0]
+                if current_account == username:
+                    self.account_selected.emit(username)
             
             self.log.info(f"계정 {username} 검증 완료")
         else:
             self.log.error(f"계정 {username} 로그인 검증 실패")
             
             # 실패한 계정 스타일 업데이트
-            items = self.account_list.findItems(username, Qt.MatchStartsWith)  # 체크 마크가 있을 수 있으므로 StartsWith 사용
+            # 정확한 계정 ID 검색을 위해 MatchExactly 사용
+            items = self.account_list.findItems(username, Qt.MatchExactly)
+            
+            # 체크 마크가 있는 경우를 위해 StartsWith로도 검색
+            if not items:
+                items = self.account_list.findItems(username + " ", Qt.MatchStartsWith)
+                
             if items:
                 items[0].setForeground(Qt.red)
                 items[0].setText(f"{username} ✗")  # 실패 표시 추가
 
     def on_account_selected(self, item):
         """계정 선택 시 호출"""
-        account_id = item.text().split(' ')[0]  # ✓ 또는 ✗ 마크 제거
+        # 계정 ID에서 ✓ 또는 ✗ 마크 제거
+        account_id = item.text().split(' ')[0]
+        
+        # 계정 선택 시그널 발생
         self.account_selected.emit(account_id)
-        self.verify_btn.setEnabled(True)  # 계정이 선택되면 검증 버튼 활성화
+        
+        # 검증 버튼 활성화
+        self.verify_btn.setEnabled(True)
         
         # 계정 상태에 따라 아이템 스타일 업데이트
         self.update_account_item_style(item)
