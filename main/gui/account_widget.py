@@ -1,13 +1,11 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                            QLineEdit, QPushButton, QMessageBox, QListWidget,
-                           QFileDialog, QDialog, QInputDialog, QProgressDialog)
+                           QDialog, QInputDialog, QProgressDialog, QListWidgetItem)
 from PyQt5.QtCore import pyqtSignal, QThread, Qt, QTimer
 from ..api.auth import NaverAuth
 import traceback
 import pandas as pd
 import os
-import shutil
-import time
 import datetime
 from PyQt5.QtWidgets import QApplication
 

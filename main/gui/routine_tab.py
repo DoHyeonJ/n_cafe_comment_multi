@@ -19,6 +19,7 @@ class RoutineTab(BaseMonitorWidget):
         super().__init__(log)
         self.is_running = False  # 실행 상태
         self.api_key_validated = False  # API 키 검증 상태
+        self.main_window = None  # MainWindow 인스턴스 저장
         self.init_ui()
 
     def init_ui(self):
@@ -504,6 +505,14 @@ class RoutineTab(BaseMonitorWidget):
         layout.addWidget(self.execute_btn)
         self.setLayout(layout)
 
+    def set_main_window(self, main_window):
+        """MainWindow 인스턴스 설정
+        
+        Args:
+            main_window: MainWindow 인스턴스
+        """
+        self.main_window = main_window
+
     def toggle_execution(self):
         """실행/중지 버튼 클릭 시 호출되는 메서드"""
         try:
@@ -670,10 +679,14 @@ class RoutineTab(BaseMonitorWidget):
         self.api_key_status.setText("")
         
         # 메인 윈도우에 API 키 설정
-        if hasattr(self.parent(), 'set_ai_api_key'):
-            self.parent().set_ai_api_key(api_key)
-        elif hasattr(self.parent().parent(), 'set_ai_api_key'):
-            self.parent().parent().set_ai_api_key(api_key)
+        if self.main_window and hasattr(self.main_window, 'set_ai_api_key'):
+            self.main_window.set_ai_api_key(api_key)
+        else:
+            # 기존 방식으로 시도 (하위 호환성 유지)
+            if hasattr(self.parent(), 'set_ai_api_key'):
+                self.parent().set_ai_api_key(api_key)
+            elif hasattr(self.parent().parent(), 'set_ai_api_key'):
+                self.parent().parent().set_ai_api_key(api_key)
         
         # 검증 버튼 활성화/비활성화
         self.validate_api_btn.setEnabled(bool(api_key))
@@ -704,6 +717,10 @@ class RoutineTab(BaseMonitorWidget):
                 self.api_key_status.setText("✓ 유효한 키")
                 self.api_key_status.setStyleSheet("color: #4CAF50;")
                 self.log.info("API 키 검증 성공: " + message)
+                
+                # 메인 윈도우에 API 키 설정
+                if self.main_window and hasattr(self.main_window, 'set_ai_api_key'):
+                    self.main_window.set_ai_api_key(api_key)
             else:
                 self.api_key_validated = False
                 self.api_key_status.setText("✗ 유효하지 않음")

@@ -518,6 +518,7 @@ class MainWindow(QMainWindow):
         
         # 모니터링 위젯 생성
         self.monitor_widget = RoutineTab(self.log)
+        self.monitor_widget.set_main_window(self)  # MainWindow 인스턴스 설정
         
         # 모니터링 위젯 시그널 연결
         self.monitor_widget.add_task_clicked.connect(self.add_task)
