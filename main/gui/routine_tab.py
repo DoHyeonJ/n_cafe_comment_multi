@@ -800,6 +800,8 @@ class RoutineTab(BaseMonitorWidget):
                         )
                         # 체크박스 상태 되돌리기
                         self.ip_tethering_checkbox.setChecked(False)
+                else:
+                    self.ip_tethering_checkbox.setChecked(False)
         else:
             # 테더링 비활성화 시도
             if is_tethering_enabled():

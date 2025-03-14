@@ -11,7 +11,7 @@ import os
 import random
 from PyQt5.QtCore import QThread, pyqtSignal, QMetaObject, Qt, Q_ARG, QVariant
 import time
-import requests
+
 # 작업관리에서 작업 리스트를 가져오고 작업에 맞는 설정값들은 스케줄러를 만들고 별도로 관리한다.
 
 class Worker(QThread):
