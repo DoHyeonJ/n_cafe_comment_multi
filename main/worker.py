@@ -629,10 +629,88 @@ class Worker(QThread):
                                     'color': 'blue'
                                 })
                                 
-                                # 좋아요 작업 수행 (실제 구현은 별도 클래스나 함수로 처리해야 함)
-                                # 여기서는 로그만 출력
+                                # 좋아요 작업 수행
+                                likes_applied = 0
+                                
+                                # 사용 가능한 계정 목록 (아직 사용하지 않은 계정)
+                                like_available_accounts = [acc for acc in all_accounts if acc not in used_accounts]
+                                
+                                # 모든 계정을 사용했다면 다시 초기화
+                                if not like_available_accounts:
+                                    used_accounts = []
+                                    like_available_accounts = all_accounts.copy()
+                                
+                                for i in range(like_count):
+                                    if not self.is_running:
+                                        break
+                                    
+                                    # 사용할 계정 선택
+                                    if not like_available_accounts:
+                                        used_accounts = []
+                                        like_available_accounts = all_accounts.copy()
+                                    
+                                    like_account = random.choice(like_available_accounts)
+                                    like_available_accounts.remove(like_account)
+                                    used_accounts.append(like_account)
+                                    
+                                    # 계정 헤더 정보 가져오기
+                                    try:
+                                        like_headers = self.get_account_header_info(like_account)
+                                    except Exception as e:
+                                        self.add_log_message({
+                                            'message': f"좋아요 계정 헤더 정보 가져오기 실패: {str(e)}",
+                                            'color': 'red'
+                                        })
+                                        continue
+                                    
+                                    # 좋아요 API 초기화
+                                    like_api = CafeAPI(like_headers)
+                                    
+                                    # 좋아요 적용
+                                    try:
+                                        # 카페 이름 가져오기 (URL 파라미터로 사용)
+                                        cafe_url_name = cafe_info.get('cafe_url', '')
+                                        
+                                        # 좋아요 적용
+                                        like_result = like_api.like_board(
+                                            cafe_id=cafe_info['cafe_id'],
+                                            article_id=article_id,
+                                            cafe_name=cafe_url_name
+                                        )
+                                        
+                                        if like_result:
+                                            likes_applied += 1
+                                            self.add_log_message({
+                                                'message': f"좋아요 적용 성공: {like_account} - 게시글 ID: {article_id}",
+                                                'color': 'green'
+                                            })
+                                        else:
+                                            self.add_log_message({
+                                                'message': f"좋아요 적용 실패: {like_account} - 게시글 ID: {article_id}",
+                                                'color': 'red'
+                                            })
+                                    except Exception as e:
+                                        self.add_log_message({
+                                            'message': f"좋아요 적용 중 오류 발생: {str(e)}",
+                                            'color': 'red'
+                                        })
+                                    
+                                    # 다음 좋아요 적용 전 대기
+                                    if i < like_count - 1:
+                                        like_wait_time = random.randint(10, 30)  # 좋아요 간 10~30초 대기
+                                        self.add_log_message({
+                                            'message': f"다음 좋아요 적용까지 대기: {like_wait_time}초",
+                                            'color': 'blue'
+                                        })
+                                        
+                                        # 대기 시간 동안 중지 여부 확인
+                                        for _ in range(like_wait_time):
+                                            if not self.is_running:
+                                                break
+                                            time.sleep(1)
+                                
                                 self.add_log_message({
-                                    'message': f"좋아요 작업 완료: {subject} - 좋아요 {like_count}개 처리",
+                                    'message': f"좋아요 작업 완료: {subject} - 좋아요 {likes_applied}개 처리",
                                     'color': 'green'
                                 })
                                 
@@ -640,7 +718,7 @@ class Worker(QThread):
                                 monitor_data = {
                                     'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                     'account_id': account_id,
-                                    'content': f"좋아요: {subject} - {like_count}개",
+                                    'content': f"좋아요: {subject} - {likes_applied}개",
                                     'url': f"https://cafe.naver.com/{cafe_info['cafe_url']}/{article_id}"
                                 }
                                 self.post_completed.emit(monitor_data)

@@ -109,7 +109,7 @@ class PromptDialog(QDialog):
         layout.addWidget(input_label)
         
         self.prompt_input = QTextEdit()
-        self.prompt_input.setPlaceholderText("예: 네이버 카페 게시글에 대한 자연스러운 댓글을 작성해주세요. 게시글의 내용을 참고하여 공감하는 내용으로 작성하되, 너무 길지 않게 2-3문장으로 작성해주세요.")
+        self.prompt_input.setPlaceholderText("예: 20대 여성 / 친근하고 활발한 말투 / 10~20자 이내로 작성")
         self.prompt_input.setStyleSheet("""
             QTextEdit {
                 background-color: #2b2b2b;

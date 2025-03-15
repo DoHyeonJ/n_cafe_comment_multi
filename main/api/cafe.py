@@ -55,7 +55,7 @@ class CafeAPI:
             response_json = response.json()
             if response.status_code == 200:
                 for menu in response_json['message']['result']['menus']:
-                    if menu['menuType'] != 'P' and menu['menuType'] != 'L' and menu['menuType'] != 'F':
+                    if menu['menuType'] != 'P' and menu['menuType'] != 'L' and menu['menuType'] != 'F' and menu['menuType'] != 'M' and menu['boardType'] != 'T':
                         menu_list.append({
                             'board_id': menu['menuId'],
                             'board_name': menu['menuName'],
@@ -403,14 +403,17 @@ if __name__ == "__main__":
     
     # 좋아요 테스트
     # 테스트할 카페 ID와 게시글 ID 설정
-    test_cafe_id = "31203823"
-    test_article_id = "489"  # 테스트할 게시글 ID 입력
+    # test_cafe_id = "31203823"
+    # test_article_id = "489"  # 테스트할 게시글 ID 입력
     
-    # 좋아요 테스트 실행
-    print(f"게시글 좋아요 테스트 시작 - 카페 ID: {test_cafe_id}, 게시글 ID: {test_article_id}")
-    like_result = cafe_api.like_board(test_cafe_id, test_article_id, "grayfvggv")
-    if like_result:
-        print("게시글 좋아요 성공!")
-    else:
-        print("게시글 좋아요 실패!")
+    # # 좋아요 테스트 실행
+    # print(f"게시글 좋아요 테스트 시작 - 카페 ID: {test_cafe_id}, 게시글 ID: {test_article_id}")
+    # like_result = cafe_api.like_board(test_cafe_id, test_article_id, "grayfvggv")
+    # if like_result:
+    #     print("게시글 좋아요 성공!")
+    # else:
+    #     print("게시글 좋아요 실패!")
+    print(cafe_api.get_board_list("31203823"))
+    # menu_type = M : 메모 게시판
+    # board_type = T : 상품 게시판
 
