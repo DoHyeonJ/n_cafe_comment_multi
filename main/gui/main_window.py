@@ -1547,6 +1547,15 @@ class MainWindow(QMainWindow):
                 - next_task_number (int): 다음 작업 번호
                 - next_execution_time (str): 다음 실행 시간
                 - wait_time (str): 대기 시간
+                - current_task (dict): 현재 작업 정보
+                    - task_id (str): 작업 ID
+                    - cafe_name (str): 카페 이름
+                    - board_name (str): 게시판 이름
+                    - article_title (str): 게시글 제목
+                    - article_id (str): 게시글 ID
+                    - account_id (str): 계정 ID
+                    - progress (str): 진행 상황
+                    - action (str): 작업 종류
         """
         # 모니터 위젯에 다음 작업 정보 표시
         self.monitor_widget.update_next_task_info(info)

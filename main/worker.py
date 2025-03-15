@@ -131,6 +131,17 @@ class Worker(QThread):
         next_time = datetime.now() + timedelta(seconds=wait_seconds)
         return next_time.strftime("%H:%M:%S")
 
+    def get_next_pending_task_index(self):
+        """다음 실행할 작업의 인덱스를 반환합니다.
+        
+        Returns:
+            int: 다음 실행할 작업의 인덱스 (0부터 시작)
+        """
+        for i, task in enumerate(self.tasks):
+            if task.get('status') != 'completed':
+                return i
+        return 0  # 모든 작업이 완료된 경우 0 반환
+
     def run(self):
         """작업 실행 (QThread에서 오버라이드)"""
         self.is_running = True
@@ -672,9 +683,27 @@ class Worker(QThread):
                                     })
                                     
                                     # 다음 작업 정보 표시
+                                    next_task_index = self.get_next_pending_task_index()
+                                    next_task = self.tasks[next_task_index] if next_task_index < len(self.tasks) else {}
+                                    next_task_id = next_task.get('id', '')
+                                    next_task_cafe_info = next_task.get('cafe_settings', {})
+                                    next_task_cafe_name = next_task_cafe_info.get('cafe_name', '')
+                                    next_task_board_name = next_task_cafe_info.get('board_name', '')
+                                    
                                     next_task_info = {
-                                        'message': f"다음 댓글 작성: {self.format_time_remaining(wait_time)}",
-                                        'next_time': self.get_next_execution_time(wait_time)
+                                        'next_task_number': next_task_index + 1,
+                                        'next_execution_time': self.get_next_execution_time(wait_time),
+                                        'wait_time': self.format_time_remaining(wait_time),
+                                        'current_task': {
+                                            'task_id': next_task_id,
+                                            'cafe_name': next_task_cafe_name,
+                                            'board_name': next_task_board_name,
+                                            'article_title': '',
+                                            'article_id': '',
+                                            'account_id': '',
+                                            'progress': '다음 작업 대기 중',
+                                            'action': '대기'
+                                        }
                                     }
                                     self.next_task_info.emit(next_task_info)
                                     
@@ -778,6 +807,24 @@ class Worker(QThread):
                                             if not self.is_running:
                                                 break
                                             time.sleep(1)
+                                        
+                                        # 좋아요 작업 정보 표시
+                                        like_task_info = {
+                                            'next_task_number': task_index + 1,
+                                            'next_execution_time': self.get_next_execution_time(like_wait_time),
+                                            'wait_time': self.format_time_remaining(like_wait_time),
+                                            'current_task': {
+                                                'task_id': task.get('id', ''),
+                                                'cafe_name': cafe_info['cafe_name'],
+                                                'board_name': cafe_info['board_name'],
+                                                'article_title': subject,
+                                                'article_id': article_id,
+                                                'account_id': like_account,
+                                                'progress': f"{i+1}/{like_count} 좋아요 작업 중",
+                                                'action': "좋아요 작업"
+                                            }
+                                        }
+                                        self.next_task_info.emit(like_task_info)
                                 
                                 self.add_log_message({
                                     'message': f"좋아요 작업 완료: {subject} - 좋아요 {likes_applied}개 처리",
@@ -855,9 +902,26 @@ class Worker(QThread):
                     })
                     
                     # 다음 작업 정보 표시
+                    next_task_index = self.get_next_pending_task_index()
+                    next_task = self.tasks[next_task_index] if next_task_index < len(self.tasks) else {}
+                    next_task_id = next_task.get('id', '')
+                    next_task_cafe_name = next_task.get('cafe_info', {}).get('cafe_name', '')
+                    next_task_board_name = next_task.get('cafe_info', {}).get('board_name', '')
+                    
                     next_task_info = {
-                        'message': f"다음 작업 실행: {self.format_time_remaining(wait_time)}",
-                        'next_time': self.get_next_execution_time(wait_time)
+                        'next_task_number': next_task_index + 1,
+                        'next_execution_time': self.get_next_execution_time(wait_time),
+                        'wait_time': self.format_time_remaining(wait_time),
+                        'current_task': {
+                            'task_id': next_task_id,
+                            'cafe_name': next_task_cafe_name,
+                            'board_name': next_task_board_name,
+                            'article_title': '',
+                            'article_id': '',
+                            'account_id': '',
+                            'progress': '다음 작업 대기 중',
+                            'action': '대기'
+                        }
                     }
                     self.next_task_info.emit(next_task_info)
                     

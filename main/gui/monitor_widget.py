@@ -25,7 +25,7 @@ class BaseMonitorWidget(QWidget):
         header.setSectionResizeMode(2, QHeaderView.Stretch)  # 내용
         header.setSectionResizeMode(3, QHeaderView.Fixed)  # URL
         
-        self.task_monitor.setColumnWidth(0, 150)  # 시간 (2025-02-27 12:31:15 포맷이 다 보이도록)
+        self.task_monitor.setColumnWidth(0, 170)  # 시간 (2025-02-27 12:31:15 포맷이 다 보이도록)
         self.task_monitor.setColumnWidth(1, 80)  # 아이디
         
         # 테이블 스타일 설정
