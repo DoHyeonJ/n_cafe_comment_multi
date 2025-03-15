@@ -1496,38 +1496,39 @@ class MainWindow(QMainWindow):
         self.monitor_widget.add_log_message(message_data)
         
     def on_post_completed(self, post_info):
-        """게시글 등록 완료 시 호출되는 메서드
+        """댓글 등록 완료 시 호출되는 메서드
         
         Args:
-            post_info (dict): 게시글 정보
+            post_info (dict): 댓글 정보
+                - timestamp (str): 작업 시간
+                - account_id (str): 계정 ID
+                - content (str): 댓글 내용
+                - url (str): 게시글 URL
         """
-        # # 게시글 정보 로그 추가
-        # self.monitor_widget.add_log_message({
-        #     'message': f"📝 게시글 등록 완료: {post_info['title']}",
-        #     'color': 'green'
-        # })
+        # 댓글 정보 로그 추가
+        self.on_log_message({
+            'message': f"📝 댓글 등록 완료: {post_info.get('account_id')} - {post_info.get('content', '')[:30]}...",
+            'color': 'green'
+        })
         
-        # 게시글 URL 로그 추가
-        # self.monitor_widget.add_log_message({
-        #     'message': f"🔗 게시글 URL: {post_info['url']}",
-        #     'color': 'blue'
-        # })
-        
-        # 게시글 정보 업데이트 (task_list에서 해당 작업 찾아서 상태 표시 업데이트)
-        # if post_info.get('task'):
-        #     task_id = post_info['task'].get('id')
-        #     if task_id:
-        #         # 작업 목록에서 해당 작업 찾기
-        #         for i in range(self.monitor_widget.task_list.count()):
-        #             item = self.monitor_widget.task_list.item(i)
-        #             if item and item.data(Qt.UserRole) == task_id:
-        #                 # 작업 위젯 가져오기
-        #                 task_widget = self.monitor_widget.task_list.itemWidget(item)
-        #                 if task_widget:
-        #                     # 게시글 URL 설정 및 표시
-        #                     task_widget.set_post_url(post_info['url'], post_info['title'])
-        #                     break 
-        pass
+        # 모니터 위젯에 댓글 정보 추가
+        try:
+            # monitor_widget에 직접 댓글 정보 추가
+            if hasattr(self, 'monitor_widget') and self.monitor_widget:
+                self.monitor_widget.add_task_monitor_row(post_info)
+                
+            # 루틴 탭의 모니터 위젯에 추가 (이전 코드 유지)
+            if hasattr(self, 'routine_tab') and self.routine_tab:
+                self.routine_tab.add_task_monitor_row(post_info)
+                
+            # 스크립트 탭의 모니터 위젯에 추가 (이전 코드 유지)
+            if hasattr(self, 'script_tab') and self.script_tab:
+                self.script_tab.add_task_monitor_row(post_info)
+        except Exception as e:
+            self.on_log_message({
+                'message': f"모니터 위젯에 댓글 정보 추가 중 오류 발생: {str(e)}",
+                'color': 'red'
+            })
 
     def set_ai_api_key(self, api_key):
         """AI API 키 설정

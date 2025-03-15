@@ -79,13 +79,13 @@ class BaseMonitorWidget(QWidget):
 
     @pyqtSlot(QVariant)
     def add_task_monitor_row(self, data):
-        """게시글 모니터에 새로운 행을 추가합니다.
+        """댓글 모니터에 새로운 행을 추가합니다.
         
         Args:
             data (dict): 모니터링 데이터
                 - timestamp (str): 작업 시간
                 - account_id (str): 계정 ID
-                - content (str): 게시글 내용
+                - content (str): 댓글 내용
                 - url (str): 게시글 URL
         """
         # 새로운 행 추가
@@ -118,7 +118,7 @@ class ScriptMonitorWidget(BaseMonitorWidget):
         )
         
         # 게시글 생성 모니터 - 헤더 변경
-        self.task_monitor_label = QLabel('게시글 생성 모니터')
+        self.task_monitor_label = QLabel('댓글 생성 모니터')
         self.task_monitor = QTableWidget(0, 4)  # 컬럼 수를 4개로 변경
         self.task_monitor.setHorizontalHeaderLabels(
             ["시간", "아이디", "내용", "URL"]

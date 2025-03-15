@@ -607,11 +607,11 @@ class Worker(QThread):
                                                     'color': 'yellow'
                                                 })
                                         
-                                        # 작업 모니터에 추가
+                                        # 댓글 작성 성공 시 post_completed 시그널 발생
                                         monitor_data = {
                                             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                             'account_id': comment_account,
-                                            'content': f"댓글: {comment_text[:50]}...",
+                                            'content': comment_text,
                                             'url': f"https://cafe.naver.com/{cafe_info['cafe_url']}/{article_id}"
                                         }
                                         self.post_completed.emit(monitor_data)
