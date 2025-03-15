@@ -4,6 +4,7 @@ import logging
 import traceback
 from bs4 import BeautifulSoup
 import random
+import re  # 정규표현식 모듈 추가
 
 class CafeAPI:
     def __init__(self, headers):
@@ -182,9 +183,10 @@ class CafeAPI:
             if response.status_code == 200:
                 response_json = response.json()
                 return response_json['result']['article']['contentHtml']
-        except:
-            self.util_log.add_log(f"게시글 내용 수집 실패: {response_json['message']}", "red")
-            logging.error("게시글 내용 수집 실패: ", response_json['message'])
+        except Exception as e:
+            logging.error(f"게시글 내용 수집 실패: {str(e)}")
+            logging.error(traceback.format_exc())
+            return None
 
     # 네이버 API에서 리턴받은 html 파싱
     def get_parse_content_html(self, html_content):
@@ -228,6 +230,122 @@ class CafeAPI:
                 continue
             
         return result
+    
+    def like_board(self, cafe_id, article_id, cafe_name):
+        """게시글에 좋아요를 누릅니다.
+        
+        Args:
+            cafe_id (str): 카페 ID
+            article_id (str): 게시글 ID
+            
+        Returns:
+            bool: 좋아요 성공 여부
+        """
+        try:
+            # 카페 URL 가져오기
+            cafe_url = f"https://cafe.naver.com/{cafe_name}"
+            
+            # 게스트 토큰 및 타임스탬프 가져오기
+            guest_token, timestamp = self.get_like_guest_token(cafe_id, article_id, cafe_name)
+
+            print(f"게스트 토큰: {guest_token}, 타임스탬프: {timestamp}")
+            
+            # 좋아요 적용
+            result = self.apply_board_like(cafe_id, guest_token, timestamp, article_id, cafe_url)
+
+            print(f"좋아요 적용 결과: {result}")
+            
+            return result
+        except Exception as e:
+            logging.error(f"게시글 좋아요 실패: {str(e)}")
+            logging.error(traceback.format_exc())
+            return False
+            
+    def get_like_guest_token(self, cafe_id, article_id, cafe_name):
+        """좋아요를 위한 게스트 토큰을 가져옵니다."""
+        try:
+            params = {
+                'suppress_response_codes': 'true',
+                'q': f'CAFE[{cafe_id}_{cafe_name}_{article_id}]|CAFE-COMMENT[{cafe_id}-{article_id}]',
+                'isDuplication': 'true',
+                'cssIds': 'BASIC_PC,CAFE_PC',
+            }
+
+            # 요청 보내기
+            response = requests.get(
+                'https://cafe.like.naver.com/v1/search/contents',
+                headers=self.headers,
+                params=params
+            )
+
+            response_json = response.json()
+            
+            if 'guestToken' in response_json and 'timestamp' in response_json:
+                return response_json['guestToken'], response_json['timestamp']
+            else:
+                logging.error(f"게스트 토큰 가져오기 실패: {response_json}")
+                return None, None
+                
+        except Exception as e:
+            logging.error(f"게스트 토큰 가져오기 중 오류 발생: {str(e)}")
+            logging.error(traceback.format_exc())
+            return None, None
+
+    def apply_board_like(self, cafe_id, guest_token, request_time, article_id, cafe_url):
+        """게시글에 좋아요를 적용합니다."""
+        try:
+            if not guest_token or not request_time:
+                logging.error("게스트 토큰 또는 타임스탬프가 없습니다.")
+                return False
+                
+            # 정규 표현식으로 com/ 뒤에 오는 문자열 추출
+            match = re.search(r'com/([^/?]+)', cafe_url)
+
+            # 추출된 결과가 있는지 확인
+            if match:
+                cafe_url_param = match.group(1)
+            else:
+                logging.error("좋아요에 실패했습니다. cafe URL을 확인해주세요. (https://cafe.naver.com/cafe_id) 와 같은 형식이어야합니다.")
+                return False
+
+            params = {
+                'suppress_response_codes': 'true',
+                '_method': 'POST',
+                'displayId': 'CAFE',
+                'reactionType': 'like',
+                'categoryId': cafe_id,
+                'guestToken': guest_token,
+                'timestamp': request_time,
+                '_ch': 'pcw',
+                'isDuplication': 'true',
+                'lang': 'ko',
+                'countType': 'default',
+                'count': '1',
+                'history': '',
+                'runtimeStatus': '',
+                'isPostTimeline': 'false',
+            }
+
+            # 요청 보내기
+            response = requests.get(
+                f'https://cafe.like.naver.com/v1/services/CAFE/contents/{cafe_id}_{cafe_url_param}_{article_id}',
+                headers=self.headers,
+                params=params,
+            )
+
+            if response.status_code == 200:
+                print(response.text)
+                logging.info(f"좋아요 성공: {response.text}")
+                return True
+            else:
+                logging.error(f"좋아요 실패 - 상태 코드: {response.status_code}")
+                logging.error(f"응답 내용: {response.text}")
+                return False
+                
+        except Exception as e:
+            logging.error(f"좋아요 적용 중 오류 발생: {str(e)}")
+            logging.error(traceback.format_exc())
+            return False
             
     def test_nickname(self, cafe_id):
         """닉네임 관련 기능 테스트"""
@@ -272,19 +390,27 @@ class CafeAPI:
         
 if __name__ == "__main__":
     headers = {
-        "content-type": "application/json",
-        "origin": "https://cafe.naver.com",
         "referer": "https://cafe.naver.com",
-        "x-cafe-product": "pc",
-        'se-authorization': "",
-        'cookie': "rankingHidden=31203823; NNB=2QP3YT6BPGMWI; ASID=31a8f9cc0000018978da1f5400000064; ncvid=#vid#_115.138.87.199IWS1; ba.uuid=a76ad3c1-5903-42bd-8399-3eb89840598c; tooltipDisplayed=true; _ga_6Z6DP60WFK=GS1.2.1726462403.1.0.1726462403.60.0.0; NFS=2; _ga=GA1.1.877073880.1704979036; _ga_EFBDNNF91G=GS1.1.1732339996.1.0.1732339999.0.0.0; _ga_8P4PY65YZ2=GS1.1.1734265772.1.1.1734265776.56.0.0; nstore_session=uajHtGrn2P2hNissMDvcn+a3; nstore_pagesession=iI4S7lqW4vuF/ssL/6s-089597; NAC=bt7NBgQZgVqM; jdh7693__storageID=e3e49b48-fddc-0668-a833-1a85161010b2; ncu=8bb05b2d3f7a1fdefb3d7a7b80681e2cd8; NACT=1; SRT30=1740880008; nid_inf=2008104164; NID_AUT=yx/rL+3DVICGF6iUGkEWzTYvy51RIcSdPLB0PSyjWtTtdX8uDEAeH9aJnoRAH3fq; NID_JKL=PqLukHQIo1uRZ7v00pbFXTCw5SK2YdU5xqof6m8PJVs=; nci4=0e39ddf6e6a7c27129c780979a650a60d8957b88dd984f9c46a4a9bb492ece01cd5b933efdbd44021bea9be157d572ba71597e30dbed88d2ee0d8d6190ae1bfdb283cebfb691b485bab5b89fbf8cdca9a58da899d1a1ac8b92a3ef9894b398ae9f9382a580b1faf9f8fff5f3f2f682f2d6f1c785ea878782ec819cf18299f0; ncmc4=6651b59e8ecfaa1941afe8fff2007401fead5cb492c80ff438dbff27b8bd6e8056b844a5512abb97980a7f870fa966d040294a13b0c0ea86f971930b80fa7db3fcdbe8d9d0dffadde2ad7b; ncvc2=9da64d3b296c09a4907210231df080f84708eb174914f42cd310249c; rankingHidden=31203823; page_uid=i8nZ7dqVN8wssb+LHwwssssstV0-232005; NID_SES=AAABiuBkrIWsVe93h9uQIqHSvg+HsKzJK7mRgd55BHW8lT6ReW1sFxW+o95RRJBtF0KIvPDGo6XnaiWAVAWuQ12Fyd+rJOmRwuKLh56mUieNJISn+TENTsUZzyCIh/+8UC2gyAtaw+3k4C12XrpohYv3we9/+LxuGh/4woDiyaBsLeMJKNoK+PrqjGx++rqskLQfhkK9vmcKptWO5GITzQdIgFU/SkqeEqiM351mHaMesC3mmB+2LjE9CmPjXI6n+Bby0x6VNmDUJDw09usTHtGSH1cDjdVOO6P95JaDFB1ioizlVzNhd39jwk/n7nOqNbE+FXw4SF9P3wGy9fGXIZ3YkYMy6upZgp3uNw55sZxYAjYr4OIFU0BotsgF4cKEzHQ5p4P44GQOxBbjhbEdGhF0Bh4vrd6JmKAItiM9PRePoJh2uz1ysug1QkVj8rRoa9l6vX8lx6EWpb2WJacMT/vH8ds7jLymWsSnDtbFXydfJQ3OEwSOFmAJo/3tZRfjqalGq5+vboKF8PxgVPvXmk/K3ZY=; SRT5=1740883552; JSESSIONID=3BE07D8B17C72F51D8F0CB8F37C5D39C; BUC=u6ue_uwHMuou27LYmRXfUTDCgkzxNck0pxj8Kpn6T7s=",
+        'Cookie': "NAC=ekgyDYA9LgdUB; NNB=DHF7IQNKTWLGM; ASID=738a57c700000190da1fcdb600000080; _ga_TC04LC8Q7L=GS1.1.1733757606.1.0.1733757609.57.0.0; _ga=GA1.2.886919162.1733757607; page_uid=i9ZtRdqX5E0ss4G+pcNssssstgZ-293676; NACT=1; SRT30=1742024166; nid_inf=1966829537; NID_AUT=lN6Ytfi6N2LQbrk4YL8VXf+QhDlZ2l3YbqWThvwXl6HZRrT5NvV8vhrpgXYF+7tc; NID_SES=AAABklQJ/PPx/IL4VDXmnMF5Mh8oigbwPp5fbPSTa4ffqYfhhPqyG5WbHPXkF4Pb6clA/CaDN+cPzXXZA+ELayPbSJY3FusQhEx9yRMf6mZeZK6qQn6PRtgICJaL9q75qfw5ulsHkqQUmgR1418RHF+7sQbVdO7BRuFmn0ZsxoLkAnlF8KJvg8e0qHDcApbwEN6/3yRp3xHa3+XKa7FDoKVB5SqPwh6NUjZKla3sVNoEuA+miDGssOK1g4lGBvI97sy2YuaS4ifWZPxlIjcWXLcI7hRlhMe281eQusmpbHPXoG0RKJdS9YjoaMQOuBLkXyoys+xKYaV6/ST0pdZVANt3iu2X68+p5diW9MMUqf3PSZ+zVXeyzTNQMgClnZzY3xjE1BBh+P8XH447Kiwazp8RLQg+pJeEBLHil57sBBuM4XpFm/MtYIfQxNnH+GT6Ie7+09AOEuVqQK5hr5b9B0X7pUCzjnGIxJYFBF4cmugyetKoSORGy/dKJh1rnWBqoa/HVBKfjWhX0KAlwx3UK/cIAMqqLSFyCHAhvUzoBNznMiEJ; NID_JKL=mhqWiVyk/j+hdoyjndteVi0aLE8yEXCiRkZvrHeq6Wg=; BUC=J7qDcTt0jp3GYrC-MhD5c91FDtK-EumE0yO7vNkOohk=",
         'user-agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        # 'userId': user_id
     }
-
-    headers = {'x-cafe-product': 'pc', 'Cookie': 'NM_srt_chzzk=1; PM_CK_loc=290e49fae29e5c027ce9fd02a78e28e5a08029d311a79232d5f52710aa5854de; NID_JKL=h7gl8MvXIGB8lqk7BIS/B9AjcB1q01XqqyE/dEZ6djA=; BUC=HHzGtBNxIF96BxiylLVAb1kELzImZVRL2kaPbzAMScw=; nid_inf=2008091554; SRT30=1740883756; NNB=CUGDJUZMY7BWO; SRT5=1740883756; NID_SES=AAABp+8eBMwMrg72W+XaZlxmp0VHMh+7vAxNpqWoAUjfbnwcJYcGb96Qy/QimDqABjogi/kk3vwQqpfShi6z16+98SIOJsDCYR11QUEV2ckHZvNQzz6OCBUv+DEz+LqJGReo2ps5hE5yV0fau3P3592ulANF5IsZ3xZFJVahocmxAYvzefRz+/wuYCQjOrk3OPSMPsUH+ORNKBCKI7eid/vS2dARBcUiLXHWq8vtPl4PRHLOsUPsLnzwg+jVlT0QDbcnhqXR/uBin4pHjArkffgauPEjP77zbeqSL1U2JD5Bhn9+mwPSUBPjuj+7n1ygj46rvGykvK5ZAXQ8jwoVdUqKGMM5ZWHIIc2Xb5+nCBqZE4oCvQ7O1J4GrHxvQbXh9AUoBrFWzye/OJbLS3WyeIdmL+Tk9FCGi1H1398icxf1Mptwg5PrlChfvYsr+1/kifoZohWSnif0QnFsbTaeKAXItPpn43tY06SYX4mk+hVaE8nFMOWBCMiQJeyNh5Y1XkVQ49ChMXCZHU/Bwx1ZYDU1wH5+1ZDiURUqsAcAN6KbObI3M/XlfzbEKrJR6C4YyV1Lbw==; NID_AUT=YPlx5R6SJO4PIaMTJMmJx2zTQtfM5Gmt6zsw5RPPpssX6E2rGGhonQDzGv4lh9GW; NACT=1; NAC=1C3LBggkw9A7;', 'Referer': 'https://cafe.naver.com/', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36', 'content-type': 'application/json', 'origin': 'https://cafe.naver.com', 'referer': 'https://cafe.naver.com', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'}
     
     cafe_api = CafeAPI(headers)
+    
+    # 닉네임 테스트
     #cafe_api.test_nickname("31203823")
-    print(cafe_api.get_nickname("31203823"))
+    #print(cafe_api.get_nickname("31203823"))
+    
+    # 좋아요 테스트
+    # 테스트할 카페 ID와 게시글 ID 설정
+    test_cafe_id = "31203823"
+    test_article_id = "489"  # 테스트할 게시글 ID 입력
+    
+    # 좋아요 테스트 실행
+    print(f"게시글 좋아요 테스트 시작 - 카페 ID: {test_cafe_id}, 게시글 ID: {test_article_id}")
+    like_result = cafe_api.like_board(test_cafe_id, test_article_id, "grayfvggv")
+    if like_result:
+        print("게시글 좋아요 성공!")
+    else:
+        print("게시글 좋아요 실패!")
 
