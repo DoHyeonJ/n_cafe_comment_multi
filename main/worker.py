@@ -273,7 +273,7 @@ class Worker(QThread):
                             'color': 'blue'
                         })
                         
-                        # 게시글 목록 가져오기
+                        # 게시글 목록 가져오기 (초기 수집)
                         articles = cafe_api.call_board_list(
                             cafe_id=cafe_info['cafe_id'],
                             menu_id=cafe_info['board_id'],
@@ -295,8 +295,89 @@ class Worker(QThread):
                         # 사용된 계정 추적
                         used_accounts = []
                         
-                        # 각 게시글에 대한 작업 수행
+                        # 중복 댓글 방지 확인
+                        prevent_duplicate = comment_settings.get('prevent_duplicate', True)
+                        cafe_id_str = str(cafe_info['cafe_id'])
+                        
+                        # 처리할 게시글 목록 (중복 제외)
+                        valid_articles = []
+                        duplicate_count = 0
+                        
+                        # 중복 확인 및 유효한 게시글 필터링
                         for article in articles:
+                            article_id_str = str(article.get('article_id'))
+                            
+                            # 중복 확인
+                            if prevent_duplicate and cafe_id_str in duplicate_comments and article_id_str in duplicate_comments[cafe_id_str]:
+                                self.add_log_message({
+                                    'message': f"이미 댓글을 작성한 게시글입니다. 건너뜁니다: {article.get('subject')}",
+                                    'color': 'yellow'
+                                })
+                                duplicate_count += 1
+                                continue
+                            
+                            # 유효한 게시글 추가
+                            valid_articles.append(article)
+                        
+                        # 중복 게시글이 있는 경우 추가 수집 시도
+                        if duplicate_count > 0 and len(valid_articles) < post_count:
+                            additional_needed = post_count - len(valid_articles)
+                            self.add_log_message({
+                                'message': f"중복 게시글 {duplicate_count}개 발견. 추가 게시글 {additional_needed}개 수집 시도",
+                                'color': 'blue'
+                            })
+                            
+                            # 추가 게시글 수집 (더 많은 게시글 요청)
+                            try:
+                                additional_articles = cafe_api.call_board_list(
+                                    cafe_id=cafe_info['cafe_id'],
+                                    menu_id=cafe_info['board_id'],
+                                    per_page=post_count + additional_needed + 10  # 여유있게 더 많이 요청
+                                )
+                                
+                                if additional_articles and len(additional_articles) > len(articles):
+                                    # 기존에 확인하지 않은 게시글만 필터링
+                                    new_articles = additional_articles[len(articles):]
+                                    
+                                    # 추가 게시글 중복 확인 및 유효한 게시글 추가
+                                    for article in new_articles:
+                                        if len(valid_articles) >= post_count:
+                                            break  # 필요한 수만큼 확보했으면 중단
+                                            
+                                        article_id_str = str(article.get('article_id'))
+                                        
+                                        # 중복 확인
+                                        if prevent_duplicate and cafe_id_str in duplicate_comments and article_id_str in duplicate_comments[cafe_id_str]:
+                                            continue  # 중복 게시글 건너뛰기
+                                        
+                                        # 유효한 게시글 추가
+                                        valid_articles.append(article)
+                                    
+                                    self.add_log_message({
+                                        'message': f"추가 게시글 수집 완료: 총 {len(valid_articles)}개 유효 게시글",
+                                        'color': 'green'
+                                    })
+                                else:
+                                    self.add_log_message({
+                                        'message': f"추가 게시글 수집 실패 또는 더 이상 게시글이 없습니다.",
+                                        'color': 'yellow'
+                                    })
+                            except Exception as e:
+                                self.add_log_message({
+                                    'message': f"추가 게시글 수집 중 오류 발생: {str(e)}",
+                                    'color': 'red'
+                                })
+                        
+                        # 유효한 게시글이 없는 경우 작업 중단
+                        if not valid_articles:
+                            self.add_log_message({
+                                'message': f"처리할 유효한 게시글이 없습니다. 모두 중복이거나 게시글이 없습니다.",
+                                'color': 'yellow'
+                            })
+                            continue
+                        
+                        # 각 게시글에 대한 작업 수행
+                        for article in valid_articles:
                             if not self.is_running:
                                 break
                             
@@ -309,18 +390,6 @@ class Worker(QThread):
                                 'message': f"게시글 처리: {subject} (ID: {article_id})",
                                 'color': 'blue'
                             })
-                            
-                            # 중복 댓글 방지 확인
-                            prevent_duplicate = comment_settings.get('prevent_duplicate', True)
-                            cafe_id_str = str(cafe_info['cafe_id'])
-                            article_id_str = str(article_id)
-                            
-                            if prevent_duplicate and cafe_id_str in duplicate_comments and article_id_str in duplicate_comments[cafe_id_str]:
-                                self.add_log_message({
-                                    'message': f"이미 댓글을 작성한 게시글입니다. 건너뜁니다: {subject}",
-                                    'color': 'yellow'
-                                })
-                                continue
                             
                             # 게시글 내용 가져오기
                             content_html = cafe_api.get_board_content(cafe_info['cafe_id'], article_id)
@@ -522,11 +591,12 @@ class Worker(QThread):
                                         
                                         # 중복 댓글 방지를 위한 기록
                                         if prevent_duplicate:
+                                            article_id_str = str(article_id)
                                             if cafe_id_str not in duplicate_comments:
                                                 duplicate_comments[cafe_id_str] = []
                                             if article_id_str not in duplicate_comments[cafe_id_str]:
                                                 duplicate_comments[cafe_id_str].append(article_id_str)
-                                            
+                                                
                                             # 파일에 저장
                                             try:
                                                 with open(duplicate_file, 'w', encoding='utf-8') as f:
@@ -730,7 +800,7 @@ class Worker(QThread):
                         
                         # 작업 완료 처리
                         task['status'] = 'completed'
-                        task['completed_count'] = len(articles)
+                        task['completed_count'] = len(valid_articles)
                         
                         # 작업 완료 시그널 발생
                         self.task_completed.emit(task)
