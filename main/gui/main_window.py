@@ -1428,6 +1428,9 @@ class MainWindow(QMainWindow):
                 # Worker 클래스에 작업 반복 설정 전달
                 self.worker.set_repeat_tasks(repeat_tasks)
                 
+                # RoutineTab에 Worker 인스턴스 설정
+                self.monitor_widget.set_worker(self.worker)
+                
                 # 시그널 연결
                 self.worker.task_completed.connect(self.on_task_completed)
                 self.worker.task_error.connect(self.on_task_error)

@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 import json
 from PyQt5.QtCore import QThread, pyqtSignal, QMetaObject, Qt, Q_ARG, QVariant
 import time
+from main.api.ip_manage import is_tethering_enabled
 
 # 작업관리에서 작업 리스트를 가져오고 작업에 맞는 설정값들은 스케줄러를 만들고 별도로 관리한다.
 
@@ -25,6 +26,7 @@ class Worker(QThread):
     post_completed = pyqtSignal(dict)  # 게시글 등록 완료 시그널 (추가)
     next_task_info = pyqtSignal(dict)  # 다음 작업 정보 시그널 (추가)
     all_tasks_completed = pyqtSignal(bool)  # 모든 작업 완료 시그널 (추가) - bool 파라미터는 정상 완료 여부
+    ip_changed = pyqtSignal(str)  # IP 변경 시그널 (추가) - 새 IP 주소를 전달
     
     def __init__(self, main_window=None):
         super().__init__()
@@ -138,7 +140,6 @@ class Worker(QThread):
         # 테더링 상태 확인
         if use_ip_tethering:
             try:
-                from main.api.ip_manage import is_tethering_enabled
                 tethering_enabled = is_tethering_enabled()
                 if not tethering_enabled:
                     self.add_log_message({
@@ -173,6 +174,16 @@ class Worker(QThread):
         min_seconds = self.min_interval * 60
         max_seconds = self.max_interval * 60
         return random.randint(min_seconds, max_seconds)
+        
+    def get_comment_wait_time(self):
+        """댓글 작업 간 랜덤한 대기 시간(초) 반환"""
+        # 댓글 작업 간 간격은 10~60초 사이 랜덤
+        return random.randint(10, 60)
+
+    def get_like_wait_time(self):
+        """좋아요 작업 간 랜덤한 대기 시간(초) 반환"""
+        # 좋아요 작업 간 간격은 10~60초 사이 랜덤
+        return random.randint(10, 60)
 
     def format_time_remaining(self, seconds):
         """남은 시간을 분:초 형식으로 변환"""
@@ -261,7 +272,6 @@ class Worker(QThread):
             # IP 테더링이 활성화된 경우 테더링 상태 확인
             if self.use_ip_tethering:
                 try:
-                    from main.api.ip_manage import is_tethering_enabled
                     tethering_enabled = is_tethering_enabled()
                     if not tethering_enabled:
                         self.add_log_message({
@@ -745,6 +755,9 @@ class Worker(QThread):
                                         # IP 변경 실행
                                         is_changed, old_ip, new_ip = change_ip()
                                         
+                                        # IP 변경 시그널 발생 (성공 여부와 관계없이 현재 IP 정보 전달)
+                                        self.ip_changed.emit(new_ip)
+                                        
                                         if is_changed:
                                             self.ip_change_success_count += 1
                                             self.add_log_message({
@@ -766,9 +779,10 @@ class Worker(QThread):
                                 
                                 # 다음 댓글 작성 전 대기
                                 if i < comment_count - 1:
-                                    wait_time = random.randint(min_interval, max_interval)
+                                    # 댓글 작업 간 일정 간격 설정
+                                    wait_time = self.get_comment_wait_time()
                                     self.add_log_message({
-                                        'message': f"다음 댓글 작성까지 대기: {wait_time}초",
+                                        'message': f"다음 댓글 작성까지 대기: {self.format_time_remaining(wait_time)}",
                                         'color': 'blue'
                                     })
                                     
@@ -916,9 +930,10 @@ class Worker(QThread):
                                     
                                     # 다음 좋아요 적용 전 대기
                                     if i < like_count - 1:
-                                        like_wait_time = random.randint(10, 30)  # 좋아요 간 10~30초 대기
+                                        # 좋아요 작업 간 일정 간격 설정
+                                        like_wait_time = self.get_like_wait_time()
                                         self.add_log_message({
-                                            'message': f"다음 좋아요 적용까지 대기: {like_wait_time}초",
+                                            'message': f"다음 좋아요 적용까지 대기: {self.format_time_remaining(like_wait_time)}",
                                             'color': 'blue'
                                         })
                                         
@@ -1020,7 +1035,7 @@ class Worker(QThread):
                     # 아직 완료되지 않은 작업이 있는 경우
                     wait_time = self.get_random_wait_time()
                     self.add_log_message({
-                        'message': f"다음 작업 실행까지 대기: {self.format_time_remaining(wait_time)}",
+                        'message': f"다음 작업(task) 실행까지 대기: {self.format_time_remaining(wait_time)} (랜덤 간격)",
                         'color': 'blue'
                     })
                     

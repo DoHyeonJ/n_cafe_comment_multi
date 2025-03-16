@@ -20,6 +20,7 @@ class RoutineTab(BaseMonitorWidget):
         self.is_running = False  # 실행 상태
         self.api_key_validated = False  # API 키 검증 상태
         self.main_window = None  # MainWindow 인스턴스 저장
+        self.worker = None  # Worker 인스턴스 저장
         self.init_ui()
 
     def init_ui(self):
@@ -512,6 +513,29 @@ class RoutineTab(BaseMonitorWidget):
             main_window: MainWindow 인스턴스
         """
         self.main_window = main_window
+        # worker 속성이 있을 때만 설정 (초기화 시점에는 없을 수 있음)
+        if hasattr(main_window, 'worker'):
+            self.set_worker(main_window.worker)
+
+    def set_worker(self, worker):
+        """Worker 인스턴스 설정 및 시그널 연결
+        
+        Args:
+            worker: Worker 인스턴스
+        """
+        self.worker = worker
+        if worker:
+            # IP 변경 시그널 연결
+            worker.ip_changed.connect(self.update_ip_label)
+            
+    def update_ip_label(self, new_ip):
+        """IP 레이블 업데이트
+        
+        Args:
+            new_ip (str): 새 IP 주소
+        """
+        if hasattr(self, 'current_ip_label'):
+            self.current_ip_label.setText(new_ip)
 
     def toggle_execution(self):
         """실행/중지 버튼 클릭 시 호출되는 메서드"""
