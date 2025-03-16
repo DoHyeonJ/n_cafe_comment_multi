@@ -5,17 +5,19 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QGridLayout,
                            QInputDialog, QListWidget, QTabWidget, QDialog,
                            QProgressBar, QFileDialog, QFormLayout, QScrollArea,
                            QMenu, QAction)
-from PyQt5.QtCore import Qt, QSize, QTimer
-from PyQt5.QtGui import QIcon, QFontMetrics, QDesktopServices
+from PyQt5.QtCore import Qt, QSize, QTimer, QMetaObject, Q_ARG, QVariant
+from PyQt5.QtGui import QIcon, QFontMetrics, QDesktopServices, QColor
 from .script_tab import ScriptTab
 from .routine_tab import RoutineTab
-from ..utils.log import Log
-from ..utils.licence import Licence
-from .styles import DARK_STYLE
 from .account_widget import AccountWidget
-from ..api.cafe import CafeAPI
 from .settings_dialog import SettingsDialog
 from .task_settings_dialog import TaskSettingsDialog
+from ..utils.log import Log
+from ..utils.licence import Licence
+from ..utils.settings_manager import SettingsManager
+from ..api.auth import NaverAuth
+from ..api.cafe import CafeAPI
+from .styles import DARK_STYLE
 from ..utils.settings_manager import SettingsManager
 from ..api.auth import NaverAuth
 from ..worker import Worker
@@ -774,9 +776,19 @@ class MainWindow(QMainWindow):
 
     def get_all_settings(self):
         """현재 모든 설정값 반환 - 계정 목록과 작업 목록만 저장"""
+        # 작업 설정 정보 가져오기
+        task_settings = {
+            'min_interval': self.monitor_widget.min_interval.value(),
+            'max_interval': self.monitor_widget.max_interval.value(),
+            'repeat': self.monitor_widget.repeat_checkbox.isChecked(),
+            'use_ip_tethering': self.monitor_widget.ip_tethering_checkbox.isChecked(),
+            'api_key': self.monitor_widget.api_key_input.text().strip()
+        }
+        
         return {
             'accounts': self.get_accounts_settings(),
-            'tasks': self.tasks
+            'tasks': self.tasks,
+            'task_settings': task_settings
         }
     
     def get_accounts_settings(self):
@@ -858,12 +870,18 @@ class MainWindow(QMainWindow):
                 self.account_widget.account_list.addItem(account_id)
                 # 계정 비밀번호도 AccountWidget에 저장
                 self.account_widget.account_passwords[account_id] = account_info['pw']
-                
+        
         # 작업 목록 복원
         if 'tasks' in settings_data:
             self.tasks = settings_data['tasks']
-        self.update_task_list()
-        
+            self.update_task_list()
+            
+        # 작업 설정 정보 복원
+        if 'task_settings' in settings_data:
+            task_settings = settings_data['task_settings']
+            # 모니터 위젯에 설정 적용
+            self.monitor_widget.load_settings(task_settings)
+            
         # 로그인 필요한 계정들에 대해 로그인 진행 (첫 번째 계정만)
         if accounts_to_login:
             self.log.info(f"첫 번째 계정에 대해 로그인을 진행합니다...")
@@ -1400,6 +1418,15 @@ class MainWindow(QMainWindow):
                 min_interval = self.monitor_widget.min_interval.value()
                 max_interval = self.monitor_widget.max_interval.value()
                 self.worker.set_intervals(min_interval, max_interval)
+                
+                # IP 테더링 설정 가져오기
+                use_ip_tethering = self.monitor_widget.ip_tethering_checkbox.isChecked()
+                self.worker.set_ip_tethering(use_ip_tethering)
+                
+                # 작업 반복 설정 가져오기
+                repeat_tasks = self.monitor_widget.repeat_checkbox.isChecked()
+                # Worker 클래스에 작업 반복 설정 전달
+                self.worker.set_repeat_tasks(repeat_tasks)
                 
                 # 시그널 연결
                 self.worker.task_completed.connect(self.on_task_completed)

@@ -821,6 +821,7 @@ class RoutineTab(BaseMonitorWidget):
             'min_interval': self.min_interval.value(),
             'max_interval': self.max_interval.value(),
             'repeat': self.repeat_checkbox.isChecked(),
+            'use_ip_tethering': self.ip_tethering_checkbox.isChecked(),
             'api_key': self.api_key_input.text().strip()
         }
 
@@ -832,6 +833,7 @@ class RoutineTab(BaseMonitorWidget):
         self.min_interval.setValue(settings.get('min_interval', 5))
         self.max_interval.setValue(settings.get('max_interval', 15))
         self.repeat_checkbox.setChecked(settings.get('repeat', True))
+        self.ip_tethering_checkbox.setChecked(settings.get('use_ip_tethering', False))
         self.api_key_input.setText(settings.get('api_key', ''))
 
     def on_ip_tethering_toggled(self, checked):

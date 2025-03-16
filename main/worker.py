@@ -5,6 +5,7 @@ from main.api.cafe import CafeAPI
 from main.utils.log import Log
 from main.api.reply import ReplyAPI
 from main.utils.openai_utils import OpenAIGenerator
+from main.api.ip_manage import change_ip
 import traceback
 import os
 import random
@@ -33,6 +34,14 @@ class Worker(QThread):
         self.min_interval = 5  # 기본값 5분
         self.max_interval = 15  # 기본값 15분
         self.logger = Log()  # Log 클래스 인스턴스 생성
+        
+        # 작업 반복 설정 초기화
+        self.repeat_tasks = False
+        
+        # IP 테더링 관련 설정 초기화
+        self.use_ip_tethering = False
+        self.ip_change_success_count = 0
+        self.ip_change_fail_count = 0
         
     def set_tasks(self, tasks):
         """작업 리스트 설정
@@ -113,6 +122,51 @@ class Worker(QThread):
         """
         self.min_interval = min_interval
         self.max_interval = max_interval
+        
+    def set_ip_tethering(self, use_ip_tethering):
+        """IP 테더링 사용 여부 설정
+        
+        Args:
+            use_ip_tethering (bool): IP 테더링 사용 여부
+        """
+        self.use_ip_tethering = use_ip_tethering
+        self.add_log_message({
+            'message': f"IP 테더링 설정이 {'활성화' if use_ip_tethering else '비활성화'}되었습니다.",
+            'color': 'blue'
+        })
+        
+        # 테더링 상태 확인
+        if use_ip_tethering:
+            try:
+                from main.api.ip_manage import is_tethering_enabled
+                tethering_enabled = is_tethering_enabled()
+                if not tethering_enabled:
+                    self.add_log_message({
+                        'message': "테더링이 활성화되어 있지 않습니다. 설정을 확인해주세요.",
+                        'color': 'yellow'
+                    })
+                else:
+                    self.add_log_message({
+                        'message': "테더링이 정상적으로 활성화되어 있습니다.",
+                        'color': 'green'
+                    })
+            except Exception as e:
+                self.add_log_message({
+                    'message': f"테더링 상태 확인 중 오류 발생: {str(e)}",
+                    'color': 'red'
+                })
+
+    def set_repeat_tasks(self, repeat_tasks):
+        """작업 반복 설정
+        
+        Args:
+            repeat_tasks (bool): 작업 반복 여부
+        """
+        self.repeat_tasks = repeat_tasks
+        self.add_log_message({
+            'message': f"작업 반복 설정이 {'활성화' if repeat_tasks else '비활성화'}되었습니다.",
+            'color': 'blue'
+        })
 
     def get_random_wait_time(self):
         """최소/최대 간격 사이의 랜덤한 대기 시간(초) 반환"""
@@ -161,15 +215,25 @@ class Worker(QThread):
             # 작업 반복 설정 확인 (안전하게 처리)
             repeat_tasks = False
             try:
-                if self.main_window:
+                # 직접 전달받은 repeat_tasks 속성이 있는지 확인
+                if hasattr(self, 'repeat_tasks'):
+                    repeat_tasks = self.repeat_tasks
+                # 기존 방식으로 설정 확인 (하위 호환성 유지)
+                elif self.main_window:
                     # MainWindow 객체에서 설정 값을 가져오는 방식을 수정
                     # 여러 가능한 속성 이름을 시도
                     if hasattr(self.main_window, 'settings'):
                         repeat_tasks = self.main_window.settings.get('repeat_tasks', False)
+                        # IP 테더링 설정 가져오기
+                        self.use_ip_tethering = self.main_window.settings.get('use_ip_tethering', False)
                     elif hasattr(self.main_window, 'config'):
                         repeat_tasks = self.main_window.config.get('repeat_tasks', False)
+                        # IP 테더링 설정 가져오기
+                        self.use_ip_tethering = self.main_window.config.get('use_ip_tethering', False)
                     elif hasattr(self.main_window, 'app_settings'):
                         repeat_tasks = self.main_window.app_settings.get('repeat_tasks', False)
+                        # IP 테더링 설정 가져오기
+                        self.use_ip_tethering = self.main_window.app_settings.get('use_ip_tethering', False)
                     else:
                         # 속성을 찾을 수 없는 경우 기본값 사용
                         self.add_log_message({
@@ -181,6 +245,39 @@ class Worker(QThread):
                     'message': f"설정 정보 로드 중 오류 발생: {str(e)}",
                     'color': 'yellow'
                 })
+            
+            # IP 테더링 설정 로그 출력
+            self.add_log_message({
+                'message': f"IP 테더링 설정: {'활성화' if self.use_ip_tethering else '비활성화'}",
+                'color': 'blue'
+            })
+            
+            # 작업 반복 설정 로그 출력
+            self.add_log_message({
+                'message': f"작업 반복 설정: {'활성화' if repeat_tasks else '비활성화'}",
+                'color': 'blue'
+            })
+            
+            # IP 테더링이 활성화된 경우 테더링 상태 확인
+            if self.use_ip_tethering:
+                try:
+                    from main.api.ip_manage import is_tethering_enabled
+                    tethering_enabled = is_tethering_enabled()
+                    if not tethering_enabled:
+                        self.add_log_message({
+                            'message': "테더링이 활성화되어 있지 않습니다. 설정을 확인해주세요.",
+                            'color': 'yellow'
+                        })
+                    else:
+                        self.add_log_message({
+                            'message': "테더링이 정상적으로 활성화되어 있습니다.",
+                            'color': 'green'
+                        })
+                except Exception as e:
+                    self.add_log_message({
+                        'message': f"테더링 상태 확인 중 오류 발생: {str(e)}",
+                        'color': 'red'
+                    })
             
             # 중복 댓글 방지를 위한 파일 로드
             duplicate_file = 'duplicate_comments.json'
@@ -637,40 +734,33 @@ class Worker(QThread):
                                         'color': 'red'
                                     })
                                 
-                                # IP 테더링 사용 여부 확인 및 적용
-                                use_ip_tethering = False
-                                try:
-                                    # 설정에서 IP 테더링 사용 여부 확인
-                                    if self.main_window:
-                                        if hasattr(self.main_window, 'settings'):
-                                            use_ip_tethering = self.main_window.settings.get('use_ip_tethering', False)
-                                        elif hasattr(self.main_window, 'config'):
-                                            use_ip_tethering = self.main_window.config.get('use_ip_tethering', False)
-                                        elif hasattr(self.main_window, 'app_settings'):
-                                            use_ip_tethering = self.main_window.app_settings.get('use_ip_tethering', False)
-                                except Exception as e:
-                                    self.add_log_message({
-                                        'message': f"IP 테더링 설정 확인 중 오류 발생: {str(e)}",
-                                        'color': 'yellow'
-                                    })
-                                
                                 # IP 테더링 적용
-                                if use_ip_tethering:
+                                if self.use_ip_tethering:
                                     try:
                                         self.add_log_message({
                                             'message': "IP 테더링 적용 중...",
                                             'color': 'blue'
                                         })
                                         
-                                        # IP 테더링 기능 구현 (실제 구현은 별도 클래스나 함수로 처리해야 함)
-                                        # 여기서는 로그만 출력
-                                        self.add_log_message({
-                                            'message': "IP 테더링 적용 완료",
-                                            'color': 'green'
-                                        })
+                                        # IP 변경 실행
+                                        is_changed, old_ip, new_ip = change_ip()
+                                        
+                                        if is_changed:
+                                            self.ip_change_success_count += 1
+                                            self.add_log_message({
+                                                'message': f"IP 변경 성공: {old_ip} → {new_ip} (성공: {self.ip_change_success_count}회)",
+                                                'color': 'green'
+                                            })
+                                        else:
+                                            self.ip_change_fail_count += 1
+                                            self.add_log_message({
+                                                'message': f"IP 변경 실패 또는 동일한 IP 할당됨: {old_ip} (실패: {self.ip_change_fail_count}회)",
+                                                'color': 'yellow'
+                                            })
                                     except Exception as e:
+                                        self.ip_change_fail_count += 1
                                         self.add_log_message({
-                                            'message': f"IP 테더링 적용 중 오류 발생: {str(e)}",
+                                            'message': f"IP 테더링 적용 중 오류 발생: {str(e)} (실패: {self.ip_change_fail_count}회)",
                                             'color': 'red'
                                         })
                                 
@@ -764,6 +854,36 @@ class Worker(QThread):
                                     
                                     # 좋아요 API 초기화
                                     like_api = CafeAPI(like_headers)
+                                    
+                                    # IP 테더링 적용
+                                    if self.use_ip_tethering:
+                                        try:
+                                            self.add_log_message({
+                                                'message': "좋아요 작업 전 IP 테더링 적용 중...",
+                                                'color': 'blue'
+                                            })
+                                            
+                                            # IP 변경 실행
+                                            is_changed, old_ip, new_ip = change_ip()
+                                            
+                                            if is_changed:
+                                                self.ip_change_success_count += 1
+                                                self.add_log_message({
+                                                    'message': f"IP 변경 성공: {old_ip} → {new_ip} (성공: {self.ip_change_success_count}회)",
+                                                    'color': 'green'
+                                                })
+                                            else:
+                                                self.ip_change_fail_count += 1
+                                                self.add_log_message({
+                                                    'message': f"IP 변경 실패 또는 동일한 IP 할당됨: {old_ip} (실패: {self.ip_change_fail_count}회)",
+                                                    'color': 'yellow'
+                                                })
+                                        except Exception as e:
+                                            self.ip_change_fail_count += 1
+                                            self.add_log_message({
+                                                'message': f"IP 테더링 적용 중 오류 발생: {str(e)} (실패: {self.ip_change_fail_count}회)",
+                                                'color': 'red'
+                                            })
                                     
                                     # 좋아요 적용
                                     try:
@@ -867,7 +987,7 @@ class Worker(QThread):
                         task['status'] = 'error'
                         task['error_count'] = task.get('error_count', 0) + 1
                 
-                # 모든 작업 완료 확인
+                # 모든 작업 완료 후 처리
                 all_completed = all(task.get('status') == 'completed' for task in self.tasks)
                 
                 if all_completed:
@@ -876,8 +996,8 @@ class Worker(QThread):
                         'color': 'green'
                     })
                     
-                    # 작업 반복 여부 확인
-                    if repeat_tasks and self.is_running:
+                    # 작업 반복 설정에 따라 처리
+                    if repeat_tasks:
                         self.add_log_message({
                             'message': "작업 반복 설정에 따라 작업을 다시 시작합니다.",
                             'color': 'blue'
@@ -889,6 +1009,9 @@ class Worker(QThread):
                             task['progress'] = 0
                             task['completed_count'] = 0
                             task['error_count'] = 0
+                        
+                        # 작업 다시 시작 (재귀 호출 대신 continue 사용)
+                        continue
                     else:
                         # 모든 작업 완료 시그널 발생 (정상 완료)
                         self.all_tasks_completed.emit(True)
