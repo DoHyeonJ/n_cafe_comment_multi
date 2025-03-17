@@ -734,6 +734,39 @@ class Worker(QThread):
                                         }
                                         self.post_completed.emit(monitor_data)
 
+                                        # IP 테더링 적용 (댓글 작성 후)
+                                        if self.use_ip_tethering:
+                                            try:
+                                                self.add_log_message({
+                                                    'message': "댓글 작성 후 IP 테더링 적용 중...",
+                                                    'color': 'blue'
+                                                })
+                                                
+                                                # IP 변경 실행
+                                                is_changed, old_ip, new_ip = change_ip()
+                                                
+                                                # IP 변경 시그널 발생 (성공 여부와 관계없이 현재 IP 정보 전달)
+                                                self.ip_changed.emit(new_ip)
+                                                
+                                                if is_changed:
+                                                    self.ip_change_success_count += 1
+                                                    self.add_log_message({
+                                                        'message': f"IP 변경 성공: {old_ip} → {new_ip} (성공: {self.ip_change_success_count}회)",
+                                                        'color': 'green'
+                                                    })
+                                                else:
+                                                    self.ip_change_fail_count += 1
+                                                    self.add_log_message({
+                                                        'message': f"IP 변경 실패 또는 동일한 IP 할당됨: {old_ip} (실패: {self.ip_change_fail_count}회)",
+                                                        'color': 'yellow'
+                                                    })
+                                            except Exception as e:
+                                                self.ip_change_fail_count += 1
+                                                self.add_log_message({
+                                                    'message': f"IP 테더링 적용 중 오류 발생: {str(e)} (실패: {self.ip_change_fail_count}회)",
+                                                    'color': 'red'
+                                                })
+
                                         # 다음 댓글 작성 전 랜덤 대기 시간 설정
                                         if i < comment_count - 1:  # 마지막 댓글이 아닌 경우에만 대기
                                             wait_time = self.get_random_wait_time()
@@ -757,39 +790,6 @@ class Worker(QThread):
                                         'message': f"댓글 작성 중 오류 발생: {str(e)}",
                                         'color': 'red'
                                     })
-                                
-                                # IP 테더링 적용
-                                if self.use_ip_tethering:
-                                    try:
-                                        self.add_log_message({
-                                            'message': "IP 테더링 적용 중...",
-                                            'color': 'blue'
-                                        })
-                                        
-                                        # IP 변경 실행
-                                        is_changed, old_ip, new_ip = change_ip()
-                                        
-                                        # IP 변경 시그널 발생 (성공 여부와 관계없이 현재 IP 정보 전달)
-                                        self.ip_changed.emit(new_ip)
-                                        
-                                        if is_changed:
-                                            self.ip_change_success_count += 1
-                                            self.add_log_message({
-                                                'message': f"IP 변경 성공: {old_ip} → {new_ip} (성공: {self.ip_change_success_count}회)",
-                                                'color': 'green'
-                                            })
-                                        else:
-                                            self.ip_change_fail_count += 1
-                                            self.add_log_message({
-                                                'message': f"IP 변경 실패 또는 동일한 IP 할당됨: {old_ip} (실패: {self.ip_change_fail_count}회)",
-                                                'color': 'yellow'
-                                            })
-                                    except Exception as e:
-                                        self.ip_change_fail_count += 1
-                                        self.add_log_message({
-                                            'message': f"IP 테더링 적용 중 오류 발생: {str(e)} (실패: {self.ip_change_fail_count}회)",
-                                            'color': 'red'
-                                        })
                                 
                             # 작업 완료 로그
                             self.add_log_message({
@@ -842,36 +842,6 @@ class Worker(QThread):
                                     
                                     # 좋아요 API 초기화
                                     like_api = CafeAPI(like_headers)
-                                    
-                                    # IP 테더링 적용
-                                    if self.use_ip_tethering:
-                                        try:
-                                            self.add_log_message({
-                                                'message': "좋아요 작업 전 IP 테더링 적용 중...",
-                                                'color': 'blue'
-                                            })
-                                            
-                                            # IP 변경 실행
-                                            is_changed, old_ip, new_ip = change_ip()
-                                            
-                                            if is_changed:
-                                                self.ip_change_success_count += 1
-                                                self.add_log_message({
-                                                    'message': f"IP 변경 성공: {old_ip} → {new_ip} (성공: {self.ip_change_success_count}회)",
-                                                    'color': 'green'
-                                                })
-                                            else:
-                                                self.ip_change_fail_count += 1
-                                                self.add_log_message({
-                                                    'message': f"IP 변경 실패 또는 동일한 IP 할당됨: {old_ip} (실패: {self.ip_change_fail_count}회)",
-                                                    'color': 'yellow'
-                                                })
-                                        except Exception as e:
-                                            self.ip_change_fail_count += 1
-                                            self.add_log_message({
-                                                'message': f"IP 테더링 적용 중 오류 발생: {str(e)} (실패: {self.ip_change_fail_count}회)",
-                                                'color': 'red'
-                                            })
                                     
                                     # 좋아요 적용
                                     try:
@@ -1103,12 +1073,12 @@ class Worker(QThread):
                 'color': 'blue'
             })
 
-            # 3분 대기
+            # 1분 대기
             self.add_log_message({
-                'message': f"재로그인 시도 전 3분 대기 중...",
+                'message': f"재로그인 시도 전 1분 대기 중...",
                 'color': 'blue'
             })
-            time.sleep(180)  # 3분 대기
+            time.sleep(60)  # 1분 대기
             
             # NaverAuth 인스턴스 생성 및 로그인
             auth = NaverAuth()

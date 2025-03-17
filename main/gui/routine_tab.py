@@ -780,7 +780,7 @@ class RoutineTab(BaseMonitorWidget):
                     - progress (str): 진행 상황
                     - action (str): 작업 종류
         """
-        next_task_number = info.get('next_task_number', 0)
+        next_task_number = info.get('next_task_number', 0) + 1
         next_execution_time = info.get('next_execution_time', '')
         wait_time = info.get('wait_time', '')
         current_task = info.get('current_task', {})
