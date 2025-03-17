@@ -94,6 +94,23 @@ class NaverAuth:
         else:  # Windows and others
             actions.key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
 
+        # IP 보안 해제
+        try:
+            # switch span 요소 찾기
+            switch_span = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "switch"))
+            )
+            
+            # 체크박스 상태 확인 및 클릭
+            checkbox = switch_span.find_element(By.CLASS_NAME, "switch_checkbox")
+            if checkbox.get_attribute("value") == "off":
+                # 라벨 클릭으로 체크박스 상태 변경
+                label = switch_span.find_element(By.CLASS_NAME, "switch_btn")
+                label.click()
+                logging.info("IP 보안이 해제되었습니다.")
+        except Exception as e:
+            logging.info(f"IP 보안 설정 변경 중 오류 발생: {str(e)}")
+
         # 로그인 버튼 클릭
         login_btn = self.driver.find_element(By.ID, "log.login")
         login_btn.click()
@@ -186,3 +203,14 @@ class NaverAuth:
         logout_url = 'https://nid.naver.com/nidlogin.logout'
         self.session.get(logout_url)
         self.session = requests.Session() 
+
+    def test_login(self):
+        """로그인 테스트"""
+        # self._login_with_credentials("jdh7693", "ahdtlfcjstk0805")
+        self._login_with_credentials("zizi7941", "ahdtlfcjstk0805!")
+        print(self.get_headers())
+
+if __name__ == "__main__":
+    auth = NaverAuth()
+    auth.test_login()
+

@@ -733,6 +733,20 @@ class Worker(QThread):
                                             'url': f"https://cafe.naver.com/{cafe_info['cafe_url']}/{article_id}"
                                         }
                                         self.post_completed.emit(monitor_data)
+
+                                        # 다음 댓글 작성 전 랜덤 대기 시간 설정
+                                        if i < comment_count - 1:  # 마지막 댓글이 아닌 경우에만 대기
+                                            wait_time = self.get_random_wait_time()
+                                            self.add_log_message({
+                                                'message': f"다음 댓글 작성까지 대기: {self.format_time_remaining(wait_time)} (랜덤 간격)",
+                                                'color': 'blue'
+                                            })
+                                            
+                                            # 대기 시간 동안 중지 여부 확인
+                                            for _ in range(wait_time):
+                                                if not self.is_running:
+                                                    break
+                                                time.sleep(1)
                                     else:
                                         self.add_log_message({
                                             'message': f"댓글 작성 실패: {comment_account}",
@@ -777,46 +791,6 @@ class Worker(QThread):
                                             'color': 'red'
                                         })
                                 
-                                # 다음 댓글 작성 전 대기
-                                if i < comment_count - 1:
-                                    # 댓글 작업 간 일정 간격 설정
-                                    wait_time = self.get_comment_wait_time()
-                                    self.add_log_message({
-                                        'message': f"다음 댓글 작성까지 대기: {self.format_time_remaining(wait_time)}",
-                                        'color': 'blue'
-                                    })
-                                    
-                                    # 다음 작업 정보 표시
-                                    next_task_index = self.get_next_pending_task_index()
-                                    next_task = self.tasks[next_task_index] if next_task_index < len(self.tasks) else {}
-                                    next_task_id = next_task.get('id', '')
-                                    next_task_cafe_info = next_task.get('cafe_settings', {})
-                                    next_task_cafe_name = next_task_cafe_info.get('cafe_name', '')
-                                    next_task_board_name = next_task_cafe_info.get('board_name', '')
-                                    
-                                    next_task_info = {
-                                        'next_task_number': next_task_index + 1,
-                                        'next_execution_time': self.get_next_execution_time(wait_time),
-                                        'wait_time': self.format_time_remaining(wait_time),
-                                        'current_task': {
-                                            'task_id': next_task_id,
-                                            'cafe_name': next_task_cafe_name,
-                                            'board_name': next_task_board_name,
-                                            'article_title': '',
-                                            'article_id': '',
-                                            'account_id': '',
-                                            'progress': '다음 작업 대기 중',
-                                            'action': '대기'
-                                        }
-                                    }
-                                    self.next_task_info.emit(next_task_info)
-                                    
-                                    # 대기 시간 동안 중지 여부 확인
-                                    for _ in range(wait_time):
-                                        if not self.is_running:
-                                            break
-                                        time.sleep(1)
-                            
                             # 작업 완료 로그
                             self.add_log_message({
                                 'message': f"게시글 작업 완료: {subject} - 댓글 {comments_written}개 작성",
@@ -1128,6 +1102,13 @@ class Worker(QThread):
                 'message': f"계정 '{account_id}' 재로그인 시도 중...",
                 'color': 'blue'
             })
+
+            # 3분 대기
+            self.add_log_message({
+                'message': f"재로그인 시도 전 3분 대기 중...",
+                'color': 'blue'
+            })
+            time.sleep(180)  # 3분 대기
             
             # NaverAuth 인스턴스 생성 및 로그인
             auth = NaverAuth()
