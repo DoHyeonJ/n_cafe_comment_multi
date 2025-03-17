@@ -23,10 +23,10 @@ class Worker(QThread):
     task_completed = pyqtSignal(dict)  # 작업 완료 시그널
     task_error = pyqtSignal(dict, str)  # 작업 오류 시그널
     log_message = pyqtSignal(dict)  # 로그 메시지 시그널
-    post_completed = pyqtSignal(dict)  # 게시글 등록 완료 시그널 (추가)
-    next_task_info = pyqtSignal(dict)  # 다음 작업 정보 시그널 (추가)
-    all_tasks_completed = pyqtSignal(bool)  # 모든 작업 완료 시그널 (추가) - bool 파라미터는 정상 완료 여부
-    ip_changed = pyqtSignal(str)  # IP 변경 시그널 (추가) - 새 IP 주소를 전달
+    post_completed = pyqtSignal(dict)  # 게시글 등록 완료 시그널
+    current_task_info = pyqtSignal(dict)  # 현재 작업 정보 시그널
+    all_tasks_completed = pyqtSignal(bool)  # 모든 작업 완료 시그널
+    ip_changed = pyqtSignal(str)  # IP 변경 시그널
     
     def __init__(self, main_window=None):
         super().__init__()
@@ -44,6 +44,10 @@ class Worker(QThread):
         self.use_ip_tethering = False
         self.ip_change_success_count = 0
         self.ip_change_fail_count = 0
+        
+        # 댓글 간격 설정 초기화
+        self.comment_interval = 60  # 기본값 60초
+        self.comment_interval_range = 15  # 기본값 ±15초
         
     def set_tasks(self, tasks):
         """작업 리스트 설정
@@ -176,9 +180,10 @@ class Worker(QThread):
         return random.randint(min_seconds, max_seconds)
         
     def get_comment_wait_time(self):
-        """댓글 작업 간 랜덤한 대기 시간(초) 반환"""
-        # 댓글 작업 간 간격은 10~60초 사이 랜덤
-        return random.randint(10, 60)
+        """댓글 작성 간 랜덤한 대기 시간(초) 반환"""
+        min_seconds = max(10, self.comment_interval - self.comment_interval_range)  # 최소 10초
+        max_seconds = self.comment_interval + self.comment_interval_range
+        return random.randint(min_seconds, max_seconds)
 
     def get_like_wait_time(self):
         """좋아요 작업 간 랜덤한 대기 시간(초) 반환"""
@@ -359,9 +364,16 @@ class Worker(QThread):
                     if task.get('status') == 'completed':
                         continue
                     
+                    # 현재 작업 정보 초기화
+                    current_task = {
+                        'task_number': task.get('id'),
+                        'status': '준비 중...'
+                    }
+                    self.current_task_info.emit(current_task)
+                    
                     # 작업 시작 로그
                     self.add_log_message({
-                        'message': f"작업 시작: {task.get('id')} - 카페: {task.get('cafe_info', {}).get('cafe_name')}",
+                        'message': f"작업 #{task.get('id')} 진행 중...",
                         'color': 'blue'
                     })
                     
@@ -521,11 +533,6 @@ class Worker(QThread):
                             max_comments = comment_count_settings.get('max', base_comment_count + comment_range)
                             
                             comment_count = random.randint(min_comments, max_comments)
-                            
-                            self.add_log_message({
-                                'message': f"댓글 작성 예정: {comment_count}개",
-                                'color': 'blue'
-                            })
                             
                             # 좋아요 수 결정 (범위 내 랜덤)
                             like_count_settings = cafe_settings.get('like_count', {'base': 3, 'range': 1, 'min': 2, 'max': 4})
@@ -702,10 +709,12 @@ class Worker(QThread):
                                     
                                     if comment_id:
                                         comments_written += 1
-                                        self.add_log_message({
-                                            'message': f"댓글 작성 성공: {comment_account} - {comment_text[:30]}...",
-                                            'color': 'green'
-                                        })
+                                        # 댓글 작성 후 작업 정보 업데이트
+                                        current_task = {
+                                            'task_number': task.get('id'),
+                                            'status': f"댓글 {comment_count-comments_written}개, 좋아요 {like_count}개 남음"
+                                        }
+                                        self.current_task_info.emit(current_task)
                                         
                                         # 중복 댓글 방지를 위한 기록
                                         if prevent_duplicate:
@@ -769,7 +778,7 @@ class Worker(QThread):
 
                                         # 다음 댓글 작성 전 랜덤 대기 시간 설정
                                         if i < comment_count - 1:  # 마지막 댓글이 아닌 경우에만 대기
-                                            wait_time = self.get_random_wait_time()
+                                            wait_time = self.get_comment_wait_time()
                                             self.add_log_message({
                                                 'message': f"다음 댓글 작성까지 대기: {self.format_time_remaining(wait_time)} (랜덤 간격)",
                                                 'color': 'blue'
@@ -857,10 +866,12 @@ class Worker(QThread):
                                         
                                         if like_result:
                                             likes_applied += 1
-                                            self.add_log_message({
-                                                'message': f"좋아요 적용 성공: {like_account} - 게시글 ID: {article_id}",
-                                                'color': 'green'
-                                            })
+                                            # 좋아요 적용 후 작업 정보 업데이트
+                                            current_task = {
+                                                'task_number': task.get('id'),
+                                                'status': f"댓글 완료, 좋아요 {like_count-likes_applied}개 남음"
+                                            }
+                                            self.current_task_info.emit(current_task)
                                         else:
                                             self.add_log_message({
                                                 'message': f"좋아요 적용 실패: {like_account} - 게시글 ID: {article_id}",
@@ -886,24 +897,6 @@ class Worker(QThread):
                                             if not self.is_running:
                                                 break
                                             time.sleep(1)
-                                        
-                                        # 좋아요 작업 정보 표시
-                                        like_task_info = {
-                                            'next_task_number': task_index + 1,
-                                            'next_execution_time': self.get_next_execution_time(like_wait_time),
-                                            'wait_time': self.format_time_remaining(like_wait_time),
-                                            'current_task': {
-                                                'task_id': task.get('id', ''),
-                                                'cafe_name': cafe_info['cafe_name'],
-                                                'board_name': cafe_info['board_name'],
-                                                'article_title': subject,
-                                                'article_id': article_id,
-                                                'account_id': like_account,
-                                                'progress': f"{i+1}/{like_count} 좋아요 작업 중",
-                                                'action': "좋아요 작업"
-                                            }
-                                        }
-                                        self.next_task_info.emit(like_task_info)
                                 
                                 self.add_log_message({
                                     'message': f"좋아요 작업 완료: {subject} - 좋아요 {likes_applied}개 처리",
@@ -946,66 +939,24 @@ class Worker(QThread):
                         task['status'] = 'error'
                         task['error_count'] = task.get('error_count', 0) + 1
                 
-                # 모든 작업 완료 후 처리
-                all_completed = all(task.get('status') == 'completed' for task in self.tasks)
+                # 작업 완료 후 다음 작업 정보 표시
+                next_task_index = task_index + 1
+                next_task = self.tasks[next_task_index] if next_task_index < len(self.tasks) else None
                 
-                if all_completed:
-                    self.add_log_message({
-                        'message': "모든 작업이 완료되었습니다.",
-                        'color': 'green'
-                    })
-                    
-                    # 작업 반복 설정에 따라 처리
-                    if repeat_tasks:
-                        self.add_log_message({
-                            'message': "작업 반복 설정에 따라 작업을 다시 시작합니다.",
-                            'color': 'blue'
-                        })
-                        
-                        # 작업 상태 초기화
-                        for task in self.tasks:
-                            task['status'] = 'pending'
-                            task['progress'] = 0
-                            task['completed_count'] = 0
-                            task['error_count'] = 0
-                        
-                        # 작업 다시 시작 (재귀 호출 대신 continue 사용)
-                        continue
-                    else:
-                        # 모든 작업 완료 시그널 발생 (정상 완료)
-                        self.all_tasks_completed.emit(True)
-                        break
-                else:
-                    # 아직 완료되지 않은 작업이 있는 경우
+                if next_task:
                     wait_time = self.get_random_wait_time()
+                    next_task_info = {
+                        'next_task_number': next_task.get('id'),
+                        'next_execution_time': self.get_next_execution_time(wait_time),
+                        'current_task_number': task.get('id')
+                    }
+                    self.current_task_info.emit(next_task_info)
+                    
+                    # 대기 시간 로그 표시
                     self.add_log_message({
-                        'message': f"다음 작업(task) 실행까지 대기: {self.format_time_remaining(wait_time)} (랜덤 간격)",
+                        'message': f"다음 작업(#{next_task.get('id')}) 실행까지 대기: {self.format_time_remaining(wait_time)} (랜덤 간격)",
                         'color': 'blue'
                     })
-                    
-                    # 다음 작업 정보 표시
-                    next_task_index = self.get_next_pending_task_index()
-                    next_task = self.tasks[next_task_index] if next_task_index < len(self.tasks) else {}
-                    next_task_id = next_task.get('id', '')
-                    next_task_cafe_name = next_task.get('cafe_info', {}).get('cafe_name', '')
-                    next_task_board_name = next_task.get('cafe_info', {}).get('board_name', '')
-                    
-                    next_task_info = {
-                        'next_task_number': next_task_index + 1,
-                        'next_execution_time': self.get_next_execution_time(wait_time),
-                        'wait_time': self.format_time_remaining(wait_time),
-                        'current_task': {
-                            'task_id': next_task_id,
-                            'cafe_name': next_task_cafe_name,
-                            'board_name': next_task_board_name,
-                            'article_title': '',
-                            'article_id': '',
-                            'account_id': '',
-                            'progress': '다음 작업 대기 중',
-                            'action': '대기'
-                        }
-                    }
-                    self.next_task_info.emit(next_task_info)
                     
                     # 대기 시간 동안 중지 여부 확인
                     for _ in range(wait_time):
@@ -1167,3 +1118,17 @@ class Worker(QThread):
         })
         
         return cafe_info
+
+    def set_comment_interval(self, base_interval, interval_range=15):
+        """댓글 작성 간격 설정
+        
+        Args:
+            base_interval (int): 기본 간격 (초)
+            interval_range (int): 간격 범위 (±초)
+        """
+        self.comment_interval = base_interval
+        self.comment_interval_range = interval_range
+        self.add_log_message({
+            'message': f"댓글 작성 간격이 설정되었습니다: {base_interval}초 (±{interval_range}초)",
+            'color': 'blue'
+        })

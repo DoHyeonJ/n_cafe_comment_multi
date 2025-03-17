@@ -1419,6 +1419,11 @@ class MainWindow(QMainWindow):
                 max_interval = self.monitor_widget.max_interval.value()
                 self.worker.set_intervals(min_interval, max_interval)
                 
+                # 댓글 간격 설정 가져오기 (script_tab에서)
+                comment_interval = self.settings_tab.comment_widget.interval_spin.value()
+                interval_range = self.settings_tab.comment_widget.interval_range_spin.value()
+                self.worker.set_comment_interval(comment_interval, interval_range)
+                
                 # IP 테더링 설정 가져오기
                 use_ip_tethering = self.monitor_widget.ip_tethering_checkbox.isChecked()
                 self.worker.set_ip_tethering(use_ip_tethering)
@@ -1436,7 +1441,7 @@ class MainWindow(QMainWindow):
                 self.worker.task_error.connect(self.on_task_error)
                 self.worker.log_message.connect(self.on_log_message)
                 self.worker.post_completed.connect(self.on_post_completed)
-                self.worker.next_task_info.connect(self.on_next_task_info)  # 다음 작업 정보 시그널 연결
+                self.worker.current_task_info.connect(self.on_current_task_info)  # 현재 작업 정보 시그널 연결
                 self.worker.all_tasks_completed.connect(self.on_all_tasks_completed)  # 모든 작업 완료 시그널 연결
                 
                 # 별도의 스레드에서 작업 실행
@@ -1569,25 +1574,15 @@ class MainWindow(QMainWindow):
         self.ai_api_key = api_key
         self.log.info("AI API 키가 설정되었습니다.")
 
-    def on_next_task_info(self, info):
-        """다음 작업 정보 수신 시 호출되는 메서드
+    def on_current_task_info(self, info):
+        """현재 작업 정보 수신 시 호출되는 메서드
         
         Args:
-            info (dict): 다음 작업 정보
-                - next_task_number (int): 다음 작업 번호
-                - next_execution_time (str): 다음 실행 시간
-                - wait_time (str): 대기 시간
-                - current_task (dict): 현재 작업 정보
-                    - task_id (str): 작업 ID
-                    - cafe_name (str): 카페 이름
-                    - board_name (str): 게시판 이름
-                    - article_title (str): 게시글 제목
-                    - article_id (str): 게시글 ID
-                    - account_id (str): 계정 ID
-                    - progress (str): 진행 상황
-                    - action (str): 작업 종류
+            info (dict): 현재 작업 정보
+                - task_number (int): 현재 작업 번호
+                - status (str): 현재 작업 상태
         """
-        # 모니터 위젯에 다음 작업 정보 표시
+        # 모니터 위젯에 현재 작업 정보 표시
         self.monitor_widget.update_next_task_info(info)
 
     def on_all_tasks_completed(self, is_normal_completion):

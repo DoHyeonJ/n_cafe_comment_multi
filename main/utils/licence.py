@@ -47,7 +47,7 @@ class Licence:
             url = "http://jdh7693.gabia.io/license"
             params = {
                 "license_key": licence_key,
-                "license_type": "N_CAFE_AI_ACTIVE"
+                "license_type": "N_CAFE_COMMENT_MULTI"
             }
             headers = {
                 "accept": "application/json"

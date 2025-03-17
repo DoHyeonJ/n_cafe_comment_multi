@@ -1,6 +1,16 @@
 import logging
 import os
+import sys
 from datetime import datetime
+
+def get_app_dir():
+    """애플리케이션 디렉토리 경로 반환"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller로 빌드된 경우
+        return os.path.dirname(sys.executable)
+    else:
+        # 일반 Python 스크립트로 실행된 경우
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class Log:
     def __init__(self):
@@ -22,7 +32,8 @@ class Log:
             date = now.strftime("%Y-%m-%d")
             
             # 로그 디렉토리 생성
-            log_dir = os.path.join("logs", f"{year}-{month}")
+            app_dir = get_app_dir()
+            log_dir = os.path.join(app_dir, "logs", f"{year}-{month}")
             os.makedirs(log_dir, exist_ok=True)
             
             # 로그 파일 경로
@@ -50,13 +61,11 @@ class Log:
             
             # 초기 로그 메시지
             self.file_logger.info("=== 로그 시스템 초기화 ===")
-            self.file_logger.info(f"로그 파일 경로: {os.path.abspath(log_file)}")
-            self.file_logger.info(f"로그 레벨: DEBUG")
+            self.file_logger.info(f"로그 파일 경로: {log_file}")
+            self.file_logger.info(f"로그 레벨: {logging.getLevelName(self.file_logger.getEffectiveLevel())}")
             
         except Exception as e:
-            import traceback
-            print(f"로거 설정 실패: {traceback.format_exc()}")
-            raise
+            print(f"로그 시스템 초기화 중 오류 발생: {str(e)}")
 
     def add_log(self, message, color="black"):
         """일반 로그 메시지 추가"""

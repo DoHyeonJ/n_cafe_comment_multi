@@ -1,17 +1,29 @@
 import os
 import json
 import shutil
+import sys
 from datetime import datetime
+
+def get_app_dir():
+    """애플리케이션 디렉토리 경로 반환"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller로 빌드된 경우
+        return os.path.dirname(sys.executable)
+    else:
+        # 일반 Python 스크립트로 실행된 경우
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class TaskManager:
     """작업 설정 관리 클래스"""
     
-    def __init__(self, base_dir="tasks"):
+    def __init__(self, base_dir=None):
         """초기화
         
         Args:
-            base_dir (str): 작업 설정 저장 기본 디렉토리
+            base_dir (str, optional): 작업 설정 저장 기본 디렉토리. 기본값은 None.
         """
+        if base_dir is None:
+            base_dir = os.path.join(get_app_dir(), "tasks")
         self.base_dir = base_dir
         
         # 기본 디렉토리 생성

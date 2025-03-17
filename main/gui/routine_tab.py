@@ -27,7 +27,7 @@ class RoutineTab(BaseMonitorWidget):
         layout = QVBoxLayout()
         
         # 다음 작업 정보 표시 영역 추가
-        next_task_info = QGroupBox("다음 작업 정보")
+        next_task_info = QGroupBox("작업 정보")
         next_task_layout = QHBoxLayout()
         
         self.next_task_label = QLabel("대기 중...")
@@ -763,81 +763,22 @@ class RoutineTab(BaseMonitorWidget):
         self.validate_api_btn.setEnabled(True)
 
     def update_next_task_info(self, info):
-        """다음 작업 정보 업데이트
+        """현재 작업 정보 업데이트
         
         Args:
-            info (dict): 다음 작업 정보
-                - next_task_number (int): 다음 작업 번호
-                - next_execution_time (str): 다음 실행 시간
-                - wait_time (str): 대기 시간
-                - current_task (dict): 현재 작업 정보
-                    - task_id (str): 작업 ID
-                    - cafe_name (str): 카페 이름
-                    - board_name (str): 게시판 이름
-                    - article_title (str): 게시글 제목
-                    - article_id (str): 게시글 ID
-                    - account_id (str): 계정 ID
-                    - progress (str): 진행 상황
-                    - action (str): 작업 종류
+            info (dict): 현재 작업 정보
+                - task_number (int): 현재 작업 번호
+                - status (str): 현재 작업 상태
         """
-        next_task_number = info.get('next_task_number', 0) + 1
-        next_execution_time = info.get('next_execution_time', '')
-        wait_time = info.get('wait_time', '')
-        current_task = info.get('current_task', {})
+        task_number = info.get('task_number')
+        status = info.get('status', '대기 중...')
         
-        # 현재 작업 정보 추출
-        task_id = current_task.get('task_id', '')
-        cafe_name = current_task.get('cafe_name', '')
-        board_name = current_task.get('board_name', '')
-        article_title = current_task.get('article_title', '')
-        account_id = current_task.get('account_id', '')
-        progress = current_task.get('progress', '')
-        action = current_task.get('action', '')
-        
-        # 작업 정보 표시 텍스트 구성
-        if action == '대기':
-            # 대기 중인 경우
-            if next_task_number > 0:
-                self.next_task_label.setText(
-                    f"다음 작업 #{next_task_number} - {next_execution_time} (대기: {wait_time})"
-                )
-            else:
-                self.next_task_label.setText("대기 중...")
-        else:
-            # 작업 중인 경우
-            task_info = f"작업 #{next_task_number}"
-            if task_id:
-                task_info += f" (ID: {task_id})"
-            
-            cafe_info = ""
-            if cafe_name:
-                cafe_info += f" | 카페: {cafe_name}"
-            if board_name:
-                cafe_info += f" | 게시판: {board_name}"
-            
-            article_info = ""
-            if article_title:
-                # 게시글 제목이 너무 길면 잘라내기
-                if len(article_title) > 20:
-                    article_title = article_title[:20] + "..."
-                article_info += f" | 게시글: {article_title}"
-            
-            account_info = ""
-            if account_id:
-                account_info += f" | 계정: {account_id}"
-            
-            progress_info = ""
-            if progress:
-                progress_info += f" | {progress}"
-            
-            action_info = ""
-            if action:
-                action_info += f" | {action} 중"
-            
-            # 최종 텍스트 구성
+        if task_number:
             self.next_task_label.setText(
-                f"{task_info}{cafe_info}{article_info}{account_info}{progress_info}{action_info} | 다음 실행: {next_execution_time}"
+                f"작업 #{task_number} | {status}"
             )
+        else:
+            self.next_task_label.setText("대기 중...")
 
     def get_settings(self):
         """현재 설정 정보 반환"""

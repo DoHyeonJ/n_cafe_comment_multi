@@ -8,6 +8,16 @@ import pandas as pd
 import os
 import datetime
 from PyQt5.QtWidgets import QApplication
+import sys
+
+def get_app_dir():
+    """애플리케이션 디렉토리 경로 반환"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller로 빌드된 경우
+        return os.path.dirname(sys.executable)
+    else:
+        # 일반 Python 스크립트로 실행된 경우
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class LoginWorker(QThread):
     finished = pyqtSignal(bool, dict)  # 성공 여부, 헤더 정보
@@ -339,7 +349,7 @@ class AccountWidget(QWidget):
         super().__init__()
         self.log = log
         self.monitor_widget = monitor_widget
-        self.account_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "account")
+        self.account_dir = os.path.join(get_app_dir(), "account")
         self.template_path = os.path.join(self.account_dir, "account_template.xlsx")
         self.login_workers = []  # 로그인 워커 목록 관리
         self.verified_accounts = set()  # 검증된 계정 목록
